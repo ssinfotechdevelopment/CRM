@@ -60,6 +60,7 @@ const allowedOrigins = [
   "http://localhost:5174",
   "https://crm-seven-jade.vercel.app",
   "https://crm-r214yejox-yadneshs-projects-d6a3e3e2.vercel.app", // your frontend
+  "https://sscrm.ssinfotech.co",
 ];
 
 app.use((req, res, next) => {
