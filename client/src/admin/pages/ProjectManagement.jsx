@@ -1,4 +1,3 @@
-// src/admin/pages/ProjectManagement.jsx
 import React, {
   useState, useEffect, useCallback, useMemo, useRef, memo
 } from "react";

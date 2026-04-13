@@ -1,4 +1,3 @@
-// src/admin/pages/StudentManagement.jsx
 import React, { useState, useEffect } from "react";
 
 // Icons (same as before)

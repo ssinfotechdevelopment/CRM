@@ -1,4 +1,3 @@
-// backend/controllers/projectController.js
 import Project from "../models/Project.js";
 import Client from "../models/Client.js";
 import Employee from "../models/employeeModel.js";
