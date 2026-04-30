@@ -106,7 +106,7 @@ const StudentManagement = () => {
     { id: 1, studentId: "1", message: "₹20,000 pending for Web Development course", date: "2024-04-20", completed: false }
   ]);
 
-  const API_URL = "https://crm-p35o.onrender.com/api/students";
+  const API_URL = "https://crm-backned.onrender.com/api/students";
 
   // Fetch all students
   const fetchStudents = async (query = "") => {
