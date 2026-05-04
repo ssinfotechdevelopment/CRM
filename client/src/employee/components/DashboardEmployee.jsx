@@ -13,6 +13,8 @@ import {
   RiDashboardHorizontalFill,
   RiTaskLine,
   RiCalendarScheduleLine,
+  RiMenuLine,
+  RiCloseLine,
 } from "react-icons/ri";
 import {
   FaBusinessTime,
@@ -21,12 +23,16 @@ import {
   FaFileSignature,
   FaMoneyBillWave,
   FaUserGraduate,
-  FaUserPlus
+  FaUserPlus,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 
 import { SiGoogletasks, SiGoogleforms } from "react-icons/si";
 import { BsQrCodeScan } from "react-icons/bs";
-import { FiSettings } from "react-icons/fi";
+import { FiSettings, FiLogOut } from "react-icons/fi";
+import { IoMdAlert } from "react-icons/io";
+import { MdSecurity, MdWarning } from "react-icons/md";
 
 // Pages
 import EmployeeAttendance from "../pages/EmployeeAttendance";
@@ -41,6 +47,7 @@ import EmployeeData from "../pages/EmployeeData";
 import LeadManagement from "../pages/LeadManagement";
 import LeaveApplicationForm from "../pages/LeaveApplicaationForm";
 import EmployeeTasks from "../pages/EmployeeTasks"
+
 /* ==================== DASHBOARD CONTENT ==================== */
 const DashboardContent = () => {
   const [stats, setStats] = useState({
@@ -141,10 +148,10 @@ const DashboardContent = () => {
 
       if (!res.ok) throw new Error(data.message || "Action failed");
 
-      alert(data.message || `Clocked ${action === "clockIn" ? "in" : "out"}!`);
+      toast.success(data.message || `Clocked ${action === "clockIn" ? "in" : "out"} successfully!`);
       fetchDashboardData();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setQuickActionLoading(null);
     }
@@ -162,20 +169,22 @@ const DashboardContent = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Welcome back, {employee?.name?.split(" ")[0] || "Employee"}!</h1>
-        <p className="text-purple-100">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Welcome Section - Responsive */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 sm:mb-2">
+          Welcome back, {employee?.name?.split(" ")[0] || "Employee"}!
+        </h1>
+        <p className="text-purple-100 text-sm sm:text-base">
           {employee?.employeeType === "Intern" 
             ? "Intern Dashboard - Limited Access Mode" 
             : "Here's your dashboard overview for today."}
         </p>
-        <div className="flex flex-wrap gap-4 mt-4">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mt-3 sm:mt-4">
           {["Position", "Department", "Status", "Type"].map((label, i) => (
-            <div key={i} className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-              <p className="text-sm opacity-90">{label}</p>
-              <p className="font-semibold">
+            <div key={i} className="bg-white/20 backdrop-blur-sm rounded-lg px-2 sm:px-4 py-1 sm:py-2">
+              <p className="text-[10px] sm:text-xs opacity-90">{label}</p>
+              <p className="text-xs sm:text-sm font-semibold">
                 {label === "Department"
                   ? employee?.department === 1 ? "Sales"
                     : employee?.department === 2 ? "Marketing"
@@ -189,76 +198,93 @@ const DashboardContent = () => {
         </div>
       </div>
 
-      {/* Quick Actions - Hide clock in/out for interns if needed */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Quick Actions - Responsive Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
         {[
           ...(employee?.employeeType !== "Intern" ? [
-            { action: "clockIn", label: "Clock In", color: "green", icon: <FaUserClock /> },
-            { action: "clockOut", label: "Clock Out", color: "red", icon: <FaUserClock /> },
+            { action: "clockIn", label: "Clock In", color: "green", icon: <FaUserClock className="text-sm sm:text-base" /> },
+            { action: "clockOut", label: "Clock Out", color: "red", icon: <FaUserClock className="text-sm sm:text-base" /> },
           ] : []),
-          { to: "/employee/dashboard/task", label: "My Tasks", color: "blue", icon: <FaTasks /> },
-          { to: "/employee/dashboard/attendance", label: "Attendance", color: "purple", icon: <RiCalendarScheduleLine /> },
+          { to: "/employee/dashboard/all/tasks", label: "My Tasks", color: "blue", icon: <FaTasks className="text-sm sm:text-base" /> },
+          { to: "/employee/dashboard/attendance", label: "Attendance", color: "purple", icon: <RiCalendarScheduleLine className="text-sm sm:text-base" /> },
         ].map((btn, i) => (
           btn.to ? (
-            <Link key={i} to={btn.to} className={`bg-${btn.color}-500 hover:bg-${btn.color}-600 text-white p-4 rounded-xl flex items-center justify-center space-x-3 transition-colors`}>
-              {btn.icon} <span className="font-semibold">{btn.label}</span>
+            <Link 
+              key={i} 
+              to={btn.to} 
+              className={`bg-${btn.color}-500 hover:bg-${btn.color}-600 text-white p-2 sm:p-4 rounded-lg sm:rounded-xl flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-3 transition-colors text-center`}
+            >
+              <span className="text-sm sm:text-base">{btn.icon}</span> 
+              <span className="text-xs sm:text-sm font-semibold">{btn.label}</span>
             </Link>
           ) : (
-            <button key={i} onClick={() => handleQuickAction(btn.action)} disabled={quickActionLoading === btn.action}
-              className={`bg-${btn.color}-500 hover:bg-${btn.color}-600 disabled:bg-${btn.color}-400 text-white p-4 rounded-xl flex items-center justify-center space-x-3 transition-colors`}>
+            <button 
+              key={i} 
+              onClick={() => handleQuickAction(btn.action)} 
+              disabled={quickActionLoading === btn.action}
+              className={`bg-${btn.color}-500 hover:bg-${btn.color}-600 disabled:bg-${btn.color}-400 text-white p-2 sm:p-4 rounded-lg sm:rounded-xl flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-3 transition-colors`}
+            >
               {quickActionLoading === btn.action ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : btn.icon}
-              <span className="font-semibold">{quickActionLoading === btn.action ? "..." : btn.label}</span>
+                <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+              ) : (
+                <span className="text-sm sm:text-base">{btn.icon}</span>
+              )}
+              <span className="text-xs sm:text-sm font-semibold">
+                {quickActionLoading === btn.action ? "..." : btn.label}
+              </span>
             </button>
           )
         ))}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Cards - Responsive */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {[
-          { label: "Total Tasks", value: stats.totalTasks, icon: <RiTaskLine />, color: "blue", extra: `${stats.completedTasks} done • ${stats.pendingTasks} pending` },
-          { label: "Attendance Rate", value: `${stats.attendanceRate}%`, icon: <FaBusinessTime />, color: "green", progress: stats.attendanceRate },
-          { label: "Working Hours", value: `${stats.workingHours}h`, icon: <RiCalendarScheduleLine />, color: "purple" },
-          { label: "Performance", value: `${employee?.performance ?? 0}%`, icon: <RiDashboardHorizontalFill />, color: "orange" },
+          { label: "Total Tasks", value: stats.totalTasks, icon: <RiTaskLine className="text-xl sm:text-2xl" />, color: "blue", extra: `${stats.completedTasks} done • ${stats.pendingTasks} pending` },
+          { label: "Attendance Rate", value: `${stats.attendanceRate}%`, icon: <FaBusinessTime className="text-xl sm:text-2xl" />, color: "green", progress: stats.attendanceRate },
+          { label: "Working Hours", value: `${stats.workingHours}h`, icon: <RiCalendarScheduleLine className="text-xl sm:text-2xl" />, color: "purple" },
+          { label: "Performance", value: `${employee?.performance ?? 0}%`, icon: <RiDashboardHorizontalFill className="text-xl sm:text-2xl" />, color: "orange" },
         ].map((stat, i) => (
-          <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div key={i} className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                <p className="text-gray-600 text-xs sm:text-sm font-medium">{stat.label}</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
               </div>
-              <div className={`p-3 bg-${stat.color}-100 rounded-lg`}>
-                <span className={`text-2xl text-${stat.color}-600`}>{stat.icon}</span>
+              <div className={`p-2 sm:p-3 bg-${stat.color}-100 rounded-lg`}>
+                <span className={`text-${stat.color}-600`}>{stat.icon}</span>
               </div>
             </div>
-            {stat.progress && (
-              <div className="mt-4">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className={`bg-${stat.color}-600 h-2 rounded-full transition-all duration-500`} style={{ width: `${stat.progress}%` }}></div>
+            {stat.progress !== undefined && (
+              <div className="mt-3 sm:mt-4">
+                <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
+                  <div className={`bg-${stat.color}-600 h-1.5 sm:h-2 rounded-full transition-all duration-500`} style={{ width: `${stat.progress}%` }}></div>
                 </div>
               </div>
             )}
-            {stat.extra && <p className="mt-2 text-xs text-gray-500">{stat.extra}</p>}
+            {stat.extra && <p className="mt-2 text-[10px] sm:text-xs text-gray-500">{stat.extra}</p>}
           </div>
         ))}
       </div>
 
-      {/* Recent */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Recent Sections - Responsive */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {[
           {
-            title: "Recent Tasks", data: recentTasks, link: "/employee/dashboard/task", key: "_id", render: t => (
-              <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-3 h-3 rounded-full ${t.priority === "High" ? "bg-red-500" : t.priority === "Medium" ? "bg-yellow-500" : "bg-green-500"}`}></div>
-                  <div>
-                    <p className="font-medium">{t.title}</p>
-                    <p className="text-sm text-gray-500">Due: {t.dueDate ? formatDate(t.dueDate) : "No due date"}</p>
+            title: "Recent Tasks", data: recentTasks, link: "/employee/dashboard/all/tasks", key: "_id", render: t => (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 gap-2">
+                <div className="flex items-start sm:items-center space-x-3">
+                  <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full mt-1 sm:mt-0 ${t.priority === "High" ? "bg-red-500" : t.priority === "Medium" ? "bg-yellow-500" : "bg-green-500"}`}></div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm sm:text-base">{t.title}</p>
+                    <p className="text-xs text-gray-500">Due: {t.dueDate ? formatDate(t.dueDate) : "No due date"}</p>
                   </div>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${t.status === "Completed" ? "bg-green-100 text-green-800" : t.status === "In Progress" ? "bg-blue-100 text-blue-800" : "bg-yellow-100 text-yellow-800"}`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium self-start sm:self-center ${
+                  t.status === "Completed" ? "bg-green-100 text-green-800" : 
+                  t.status === "In Progress" ? "bg-blue-100 text-blue-800" : 
+                  "bg-yellow-100 text-yellow-800"
+                }`}>
                   {t.status}
                 </span>
               </div>
@@ -266,33 +292,39 @@ const DashboardContent = () => {
           },
           {
             title: "Recent Attendance", data: recentAttendance, link: "/employee/dashboard/attendance", key: "_id", render: r => (
-              <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 gap-2">
                 <div>
-                  <p className="font-medium">{formatDate(r.date)}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-medium text-sm sm:text-base">{formatDate(r.date)}</p>
+                  <p className="text-xs text-gray-500">
                     {r.clockIn && `In: ${formatTime(r.clockIn)}`}
                     {r.clockOut && ` • Out: ${formatTime(r.clockOut)}`}
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${r.status === "Present" ? "bg-green-100 text-green-800" : r.status === "Absent" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}`}>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    r.status === "Present" ? "bg-green-100 text-green-800" : 
+                    r.status === "Absent" ? "bg-red-100 text-red-800" : 
+                    "bg-yellow-100 text-yellow-800"
+                  }`}>
                     {r.status}
                   </span>
-                  {r.workingHours && <p className="text-sm text-gray-500 mt-1">{r.workingHours}h</p>}
+                  {r.workingHours && <p className="text-xs text-gray-500">{r.workingHours}h</p>}
                 </div>
               </div>
             )
           }
         ].map((section, i) => (
-          <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
-              <Link to={section.link} className="text-purple-600 hover:text-purple-700 text-sm font-medium">View all</Link>
+          <div key={i} className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">{section.title}</h3>
+              <Link to={section.link} className="text-purple-600 hover:text-purple-700 text-xs sm:text-sm font-medium">
+                View all
+              </Link>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {section.data.length > 0 ? section.data.map(item => (
                 <div key={item[section.key]}>{section.render(item)}</div>
-              )) : <p className="text-gray-500 text-center py-4">No records found</p>}
+              )) : <p className="text-gray-500 text-center py-4 text-sm">No records found</p>}
             </div>
           </div>
         ))}
@@ -303,9 +335,26 @@ const DashboardContent = () => {
 
 /* ==================== MAIN LAYOUT ==================== */
 const DashboardEmployee = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Check screen size for responsive sidebar
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Check authentication on mount only
   useEffect(() => {
@@ -331,41 +380,36 @@ const DashboardEmployee = () => {
 
   // Define all possible menu items
   const allMenuItems = [
-    { path: "/employee/dashboard", label: "Dashboard", icon: <RiDashboardHorizontalFill /> },
-    { path: "/employee/dashboard/students", label: "Students Attendance", icon: <FaUserGraduate /> },
-    // { path: "/employee/dashboard/courses", label: "Course Management", icon: <FaFileSignature /> },
-    { path: "/employee/dashboard/attendance", label: "My Attendance", icon: <FaBusinessTime /> },
-    { path: "/employee/dashboard/QRstudentattendance", label: "Student QR Attendance", icon: <BsQrCodeScan /> },
-    { path: "/employee/dashboard/leaverequest", label: "Leave Request", icon: <SiGoogleforms /> },
-    { path: "/employee/dashboard/leadmanagement", label: "Lead Management", icon: <FaUserPlus /> },
-    // { path: "/employee/dashboard/task", label: "My Tasks", icon: <SiGoogletasks /> },
-     { path: "/employee/dashboard/all/tasks", label: "My Tasks", icon: <SiGoogletasks /> },
-    { path: "/employee/dashboard/expense", label: "Expense", icon: <FaMoneyBillWave /> },
-    { path: "/employee/dashboard/settings", label: "Settings", icon: <FiSettings /> },
+    { path: "/employee/dashboard", label: "Dashboard", icon: <RiDashboardHorizontalFill className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/students", label: "Students Attendance", icon: <FaUserGraduate className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/attendance", label: "My Attendance", icon: <FaBusinessTime className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/QRstudentattendance", label: "Student QR", icon: <BsQrCodeScan className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/leaverequest", label: "Leave Request", icon: <SiGoogleforms className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/leadmanagement", label: "Lead Management", icon: <FaUserPlus className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/all/tasks", label: "My Tasks", icon: <SiGoogletasks className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/expense", label: "Expense", icon: <FaMoneyBillWave className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/settings", label: "Settings", icon: <FiSettings className="text-base sm:text-xl" /> },
   ];
 
   // Filter menu items based on employeeType
   const getFilteredMenuItems = () => {
     if (!employee) return allMenuItems;
     
-    // If employeeType is "Intern", only show specific routes
     if (employee.employeeType === "Intern") {
       return allMenuItems.filter(item => {
         const allowedRoutes = [
-          "/employee/dashboard", // Dashboard
-          "/employee/dashboard/attendance", // My Attendance
-          "/employee/dashboard/leaverequest", // Leave Request
-          "/employee/dashboard/leadmanagement", // Lead Management (if interns need this)
-          "/employee/dashboard/expense", // Expense
-          "/employee/dashboard/task", // My Tasks
-          "/employee/dashboard/all/tasks", // Employee Tasks
-          "/employee/dashboard/settings", // Settings
+          "/employee/dashboard",
+          "/employee/dashboard/attendance",
+          "/employee/dashboard/leaverequest",
+          "/employee/dashboard/leadmanagement",
+          "/employee/dashboard/expense",
+          "/employee/dashboard/all/tasks",
+          "/employee/dashboard/settings",
         ];
         return allowedRoutes.includes(item.path);
       });
     }
     
-    // For other employee types (Full-time, Part-time, etc.), show all routes
     return allMenuItems;
   };
 
@@ -386,7 +430,6 @@ const DashboardEmployee = () => {
         "/employee/dashboard/settings",
       ];
       
-      // Handle nested routes
       if (path.startsWith("/employee/dashboard")) {
         return allowedRoutes.some(allowedPath => 
           path === allowedPath || path.startsWith(allowedPath + "/")
@@ -396,7 +439,7 @@ const DashboardEmployee = () => {
       return allowedRoutes.includes(path);
     }
     
-    return true; // All routes allowed for non-interns
+    return true;
   };
 
   // Redirect if trying to access unauthorized route
@@ -416,59 +459,79 @@ const DashboardEmployee = () => {
   const currentRoute = menuItems.find(i => i.path === location.pathname);
   const isRestrictedRoute = !currentRoute && location.pathname !== "/employee/dashboard";
 
+  // Overlay for mobile sidebar
+  const sidebarOverlay = sidebarOpen && isMobile && (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 z-20 transition-opacity duration-300"
+      onClick={() => setSidebarOpen(false)}
+    />
+  );
+
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <aside className={`${sidebarOpen ? "w-64" : "w-20"} bg-gray-800 text-white transition-all duration-300 flex flex-col`}>
-        <div className="p-4 flex items-center justify-between">
-          {sidebarOpen && (
-            <div>
-              <h2 className="text-xl font-bold">Employee Portal</h2>
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+      {/* Sidebar Overlay */}
+      {sidebarOverlay}
+      
+      {/* Sidebar - Responsive */}
+      <aside className={`fixed md:relative z-30 bg-gray-800 text-white transition-all duration-300 flex flex-col ${
+        sidebarOpen ? "w-64 translate-x-0" : "w-64 -translate-x-full md:translate-x-0 md:w-20"
+      } h-full overflow-y-auto shadow-lg`}>
+        <div className="p-3 sm:p-4 flex items-center justify-between border-b border-gray-700">
+          {sidebarOpen && !isMobile && (
+            <div className="flex-1">
+              <h2 className="text-base sm:text-xl font-bold">Employee Portal</h2>
               {isIntern && (
-                <p className="text-xs text-yellow-300 mt-1">Intern Mode</p>
+                <p className="text-[10px] sm:text-xs text-yellow-300 mt-1">Intern Mode</p>
               )}
+            </div>
+          )}
+          {sidebarOpen && isMobile && (
+            <div className="flex-1">
+              <h2 className="text-base font-bold">Menu</h2>
             </div>
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-700 transition-colors text-xl"
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
-            {sidebarOpen ? "◀" : "▶"}
+            {sidebarOpen ? <FaChevronLeft className="text-sm sm:text-base" /> : <FaChevronRight className="text-sm sm:text-base" />}
           </button>
         </div>
 
-        <nav className="mt-4 flex-1 overflow-y-auto">
+        <nav className="mt-2 sm:mt-4 flex-1 overflow-y-auto">
           {menuItems.map(item => (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center p-4 hover:bg-gray-700 transition-colors ${location.pathname === item.path ? "bg-gray-900 border-r-4 border-purple-500" : ""
-                }`}
+              onClick={() => isMobile && setSidebarOpen(false)}
+              className={`flex items-center p-3 sm:p-4 hover:bg-gray-700 transition-colors ${
+                location.pathname === item.path ? "bg-gray-900 border-r-4 border-purple-500" : ""
+              }`}
             >
-              <span className="text-xl mr-3">{item.icon}</span>
-              {sidebarOpen && <span className="text-base">{item.label}</span>}
+              <span className="text-base sm:text-xl mr-2 sm:mr-3">{item.icon}</span>
+              {(sidebarOpen || !isMobile) && <span className="text-xs sm:text-base">{item.label}</span>}
             </Link>
           ))}
         </nav>
 
-        {sidebarOpen && employee && (
-          <div className="p-4 border-t border-gray-700 bg-gray-900 text-sm">
+        {employee && (
+          <div className="p-3 sm:p-4 border-t border-gray-700 bg-gray-900 text-xs sm:text-sm">
             <div className="flex justify-between items-start">
-              <div>
-                <p className="font-semibold truncate">{employee.name}</p>
-                <p className="text-gray-400 text-xs truncate">{employee.position}</p>
-                <p className="text-gray-400 text-xs">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate text-sm sm:text-base">{employee.name}</p>
+                <p className="text-gray-400 text-[10px] sm:text-xs truncate">{employee.position}</p>
+                <p className="text-gray-400 text-[10px] sm:text-xs truncate">
                   {employee.department === 1 ? "Sales" :
                     employee.department === 2 ? "Marketing" :
                       employee.department === 3 ? "Development" : "Other"}
                 </p>
               </div>
-              <div className="text-right">
-                <p className={`text-xs ${employee.status === "Active" ? "text-green-400" : "text-red-400"}`}>
-                  ● {employee.status}
+              <div className="text-right ml-2">
+                <p className={`text-[10px] sm:text-xs ${employee.status === "Active" ? "text-green-400" : "text-red-400"}`}>
+                  {employee.status === "Active" ? "Active" : "Inactive"}
                 </p>
-                <p className={`text-xs mt-1 ${employee.employeeType === "Intern" ? "text-yellow-400" : "text-blue-400"}`}>
-                  {employee.employeeType}
+                <p className={`text-[10px] sm:text-xs mt-1 ${employee.employeeType === "Intern" ? "text-yellow-400" : "text-blue-400"}`}>
+                  {employee.employeeType === "Intern" ? "Intern" : "Employee"}
                 </p>
               </div>
             </div>
@@ -477,54 +540,64 @@ const DashboardEmployee = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        {/* Header - Responsive */}
         <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex items-center justify-between p-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                {currentRoute?.label || "Employee Dashboard"}
-              </h1>
-              {isIntern && (
-                <p className="text-sm text-gray-500">Intern Access Mode</p>
-              )}
+          <div className="flex items-center justify-between p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <RiMenuLine className="text-lg sm:text-xl" />
+              </button>
+              <div>
+                <h1 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800">
+                  {currentRoute?.label || "Employee Dashboard"}
+                </h1>
+                {isIntern && (
+                  <p className="text-[10px] sm:text-xs text-gray-500">Intern Access Mode</p>
+                )}
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {employee && (
-                <div className="text-right">
-                  <p className="text-gray-700 font-medium">{employee.name}</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-gray-500 text-sm">{employee.position}</p>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${employee.employeeType === "Intern" ? "bg-yellow-100 text-yellow-800" : "bg-blue-100 text-blue-800"}`}>
-                      {employee.employeeType}
+                <div className="text-right hidden sm:block">
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{employee.name}</p>
+                  <div className="flex items-center gap-2 justify-end">
+                    <p className="text-gray-500 text-xs">{employee.position}</p>
+                    <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs font-medium ${
+                      employee.employeeType === "Intern" ? "bg-yellow-100 text-yellow-800" : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {employee.employeeType === "Intern" ? "Intern" : "Employee"}
                     </span>
                   </div>
                 </div>
               )}
               <button
                 onClick={handleLogout}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors font-medium text-sm sm:text-base flex items-center gap-1 sm:gap-2"
               >
-                Logout
+                <FiLogOut className="text-sm sm:text-base" />
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-gray-50">
           {isRestrictedRoute ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 text-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <MdWarning className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Restricted</h2>
-              <p className="text-gray-600 mb-6">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 mb-2">Access Restricted</h2>
+              <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
                 As an intern, you don't have permission to access this page.
               </p>
               <Link
                 to="/employee/dashboard"
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors font-medium inline-block"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-6 py-2 rounded-lg transition-colors font-medium inline-block text-sm sm:text-base"
               >
                 Go to Dashboard
               </Link>
@@ -533,25 +606,20 @@ const DashboardEmployee = () => {
             <Routes>
               <Route index element={<EmployeeData />} />
               
-              {/* Only render these routes if employee is not an intern or if route is allowed */}
               {!isIntern && (
                 <>
                   <Route path="students" element={<StudentAttendance />} />
-                  {/* <Route path="courses" element={<CourseManagement />} /> */}
                   <Route path="QRstudentattendance" element={<QRStudentAttendance />} />
                 </>
               )}
               
-              {/* Always render these routes (allowed for interns) */}
               <Route path="attendance" element={<EmployeeAttendance />} />
               <Route path="leaverequest" element={<LeaveApplicationForm />} />
               <Route path="leadmanagement" element={<LeadManagement />} />
-              {/* <Route path="task" element={<TaskTracker />} /> */}
               <Route path="all/tasks" element={<EmployeeTasks />} />
               <Route path="expense" element={<Expense />} />
               <Route path="settings" element={<EmployeeSettings />} />
               
-              {/* Redirect any unauthorized routes */}
               <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
             </Routes>
           )}
