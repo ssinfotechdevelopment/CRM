@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-    baseURL: "https://crm-backned-v1.onrender.com",
+    baseURL: "https://crm-backend-v2.onrender.com",
 });
 
 // Add token to every request automatically

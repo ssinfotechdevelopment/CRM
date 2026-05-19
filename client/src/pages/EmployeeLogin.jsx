@@ -42,7 +42,7 @@ const EmployeeLogin = () => {
     }
 
     try {
-      const res = await fetch("https://crm-backned-v1.onrender.com/api/employee/login", {
+      const res = await fetch("https://crm-backend-v2.onrender.com/api/employee/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),

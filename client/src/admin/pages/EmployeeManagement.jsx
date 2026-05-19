@@ -127,7 +127,7 @@ const DEPARTMENTS = [
   { id: 6, name: "Operations" },
 ];
 
-const API_URL = "https://crm-backned-v1.onrender.com/api";
+const API_URL = "https://crm-backend-v2.onrender.com/api";
 const BATCH_SIZE = 4; // load metrics for N employees at a time
 
 const EMPTY_NEW_EMP = {

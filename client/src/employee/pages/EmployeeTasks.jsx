@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast, Toaster } from "react-hot-toast";
 
-const API_BASE = "https://crm-backned-v1.onrender.com/api/employee";
+const API_BASE = "https://crm-backend-v2.onrender.com/api/employee";
 
 const EmployeeTasks = () => {
   const [tasks, setTasks] = useState([]);

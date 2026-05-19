@@ -10,7 +10,7 @@ import {
 import { toast, Toaster } from "react-hot-toast";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const API_URL  = "https://crm-backned-v1.onrender.com/api";
+const API_URL  = "https://crm-backend-v2.onrender.com/api";
 const BATCH_SZ = 4;
 
 const PRIORITY_META = {
