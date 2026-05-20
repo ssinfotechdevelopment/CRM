@@ -57,6 +57,7 @@ app.use(express.json());
 const allowedOrigins = [
   "https://ssinfotech-crm.netlify.app", 
   "https://sscrm.ssinfotech.co",
+  "https://crm-backend-v2.onrender.com"
 ];
 
 app.use((req, res, next) => {

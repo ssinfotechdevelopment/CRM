@@ -506,10 +506,27 @@ export const resetPassword = async (req, res) => {
 // ---------------------------------------------------------------------
 
 
+// ---------------------------------------------------------------------
+// CHANGE PASSWORD
+// ---------------------------------------------------------------------
 export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
-    const employeeId = req.user?.id; // employee logged in from token
+
+    // ✅ Try all possible sources
+    const employeeId =
+      req.employee?._id ||
+      req.employee?.id ||
+      req.user?._id ||
+      req.user?.id;
+
+    // 🔍 DEBUG - check terminal after hitting API
+    console.log("=================================");
+    console.log("req.employee:", req.employee);
+    console.log("req.user    :", req.user);
+    console.log("employeeId  :", employeeId);
+    console.log("req.body    :", req.body);
+    console.log("=================================");
 
     // ---------------------- VALIDATION ----------------------
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -551,9 +568,9 @@ export const changePassword = async (req, res) => {
     }
 
     // ---------------------- CHECK CURRENT PASSWORD ----------------------
-    const isMatched = await bcrypt.compare(currentPassword, employee.password);
+    const decryptedPassword = decryptPassword(employee.password);
 
-    if (!isMatched) {
+    if (currentPassword !== decryptedPassword) {
       return res.status(401).json({
         success: false,
         message: "Current password is incorrect."
@@ -561,8 +578,8 @@ export const changePassword = async (req, res) => {
     }
 
     // ---------------------- UPDATE PASSWORD ----------------------
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    employee.password = hashedPassword;
+    const encryptedPassword = encryptPassword(newPassword);
+    employee.password = encryptedPassword;
     await employee.save();
 
     return res.status(200).json({
