@@ -15,7 +15,7 @@ router.post("/login", login);
 // EMPLOYEE ROUTES - NO PROTECTION
 router.get("/me",protectEmployee, getCurrentEmployee);
 router.patch("/me/change-password",protectEmployee, changePassword);
-router.patch("/update-profile",protectEmployee, updateProfile);
+router.patch("/me/update-profile", protectEmployee, updateProfile); 
 // routes/employeeRoutes.js
 router.get('/my/tasks',protectEmployee, getMyTasks);
 router.get("/:id/tasks", getEmployeeWithTasks);

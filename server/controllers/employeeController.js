@@ -1226,9 +1226,12 @@ export const getCurrentEmployee = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { name, email, phone, department, position } = req.body;
-    const employeeId = req.user?.id;
 
-    // ----------- AUTH CHECK -----------
+    // ✅ FIXED
+    const employeeId = req.employee?._id || req.employee?.id;
+
+    console.log("👤 updateProfile - employeeId:", employeeId);
+
     if (!employeeId) {
       return res.status(401).json({
         success: false,
@@ -1236,7 +1239,6 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // ----------- REQUIRED FIELDS VALIDATION -----------
     if (!name?.trim()) {
       return res.status(400).json({
         success: false,
@@ -1260,7 +1262,6 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // ----------- FIND EMPLOYEE -----------
     const employee = await Employee.findById(employeeId);
 
     if (!employee) {
@@ -1270,7 +1271,6 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // ----------- UNIQUE EMAIL CHECK -----------
     if (formattedEmail !== employee.email.toLowerCase()) {
       const exists = await Employee.findOne({
         email: formattedEmail,
@@ -1285,7 +1285,6 @@ export const updateProfile = async (req, res) => {
       }
     }
 
-    // ----------- UPDATE DATA -----------
     const updatedData = {
       name: name.trim(),
       email: formattedEmail,
@@ -1293,7 +1292,7 @@ export const updateProfile = async (req, res) => {
     };
 
     if (phone?.trim()) updatedData.phone = phone.trim();
-    if (department?.trim()) updatedData.department = department.trim();
+    if (department) updatedData.department = Number(department); // ✅ FIXED: Number not String
     if (position?.trim()) updatedData.position = position.trim();
 
     const updatedEmployee = await Employee.findByIdAndUpdate(
@@ -1302,10 +1301,14 @@ export const updateProfile = async (req, res) => {
       { new: true, runValidators: true }
     ).select("-password");
 
-    // ----------- STATS REBUILDING -----------
     const tasks = await Task.find({ employeeId });
-    const completedTasks = tasks.filter(t => ["Completed", "completed"].includes(t.status)).length;
-    const taskCompletionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+    const completedTasks = tasks.filter(t =>
+      ["Completed", "completed"].includes(t.status)
+    ).length;
+    const taskCompletionRate =
+      tasks.length > 0
+        ? Math.round((completedTasks / tasks.length) * 100)
+        : 0;
 
     const totalDaysAttended = await Attendance.countDocuments({
       employee: employeeId,
@@ -1313,7 +1316,6 @@ export const updateProfile = async (req, res) => {
       clockOut: { $exists: true }
     });
 
-    // ----------- SUCCESS RESPONSE -----------
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
@@ -1337,7 +1339,6 @@ export const updateProfile = async (req, res) => {
   } catch (error) {
     console.error("UpdateProfile Error:", error);
 
-    // Duplicate email error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -1345,7 +1346,6 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // Mongoose validation errors
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -1355,7 +1355,6 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // Fallback
     return res.status(500).json({
       success: false,
       message: "Server error. Please try again later.",
@@ -1363,6 +1362,7 @@ export const updateProfile = async (req, res) => {
     });
   }
 };
+
 
 
 

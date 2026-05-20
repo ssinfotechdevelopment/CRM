@@ -145,7 +145,7 @@ const EmployeeSettings = () => {
     setProfileLoading(true);
 
     try {
-      const res = await fetch("https://crm-backend-v2.onrender.com/api/employee/update-profile", {
+      const res = await fetch("https://crm-backend-v2.onrender.com/api/employee/me/update-profile", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
