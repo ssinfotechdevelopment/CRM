@@ -1,36 +1,3 @@
-// // Updated AppRoutes.jsx (simplified version)
-// import React from "react";
-// import { Routes, Route, Navigate } from "react-router-dom";
-// import AdminLogin from "../pages/AdminLogin";
-// import EmployeeLogin from "../pages/EmployeeLogin";
-// import StudentForm from "../pages/StudentForm";
-// import DashboardAdmin from "../admin/components/DashboardAdmin";
-// import DashboardEmployee from "../employee/components/DashboardEmployee";
-
-// const ProtectedRoute = ({ children, role }) => {
-//   const token = localStorage.getItem("adminToken");
-//   const userRole = localStorage.getItem("userRole");
-
-//   if (!token || (role && userRole !== role)) {
-//     return <Navigate to={role === "admin" ? "/admin" : "/employee/login"} replace />;
-//   }
-//   return children;
-// };
-
-// const AppRoutes = () => (
-//   <Routes>
-//     <Route path="/" element={<Navigate to="/employee/login" replace />} />
-//     <Route path="/student-form" element={<StudentForm />} />
-//     <Route path="/admin" element={<AdminLogin />} />
-//     <Route path="/employee/login" element={<EmployeeLogin />} />
-//     <Route path="/admin/dashboard/*" element={<ProtectedRoute role="admin"><DashboardAdmin /></ProtectedRoute>} />
-//     <Route path="/employee/dashboard/*" element={<ProtectedRoute role="employee"><DashboardEmployee /></ProtectedRoute>} />
-//     <Route path="*" element={<Navigate to="/" replace />} />
-//   </Routes>
-// );
-
-// export default AppRoutes;
-// src/AppRoutes.jsx
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLogin from "../pages/AdminLogin";
@@ -38,6 +5,7 @@ import EmployeeLogin from "../pages/EmployeeLogin";
 import StudentForm from "../pages/StudentForm";
 import DashboardAdmin from "../admin/components/DashboardAdmin";
 import DashboardEmployee from "../employee/components/DashboardEmployee";
+import AdminAttendanceMonitor from "../admin/pages/AdminAttendanceMonitor";
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -133,6 +101,16 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } 
     />
+
+    {/* 👇 NEW ROUTE - Admin Attendance Monitor */}
+    <Route 
+      path="/admin/attendance-monitor" 
+      element={
+        <ProtectedRoute requiredRole="admin">
+          <AdminAttendanceMonitor />
+        </ProtectedRoute>
+      } 
+    />
     
     {/* Protected employee routes */}
     <Route 
@@ -143,7 +121,8 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } 
     />
-    \<Route 
+    
+    <Route 
       path="/employee/task" 
       element={
         <ProtectedRoute requiredRole="employee">
