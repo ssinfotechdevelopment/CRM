@@ -10,7 +10,7 @@ import Counter from "./models/counter.js";
 // Routes
 import adminRoutes from "./routes/adminRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
-import salaryRoute from "./routes/salaryRoute.js";
+import salaryRoutes from "./routes/salaryRoute.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import studentRoutes from "./routes/student.routes.js";
 import Course from "./routes/courses.js";
@@ -19,6 +19,8 @@ import projectRoutes from "./routes/projectRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
+import holidayRoutes from "./routes/holidayRoutes.js";
+
 
 dotenv.config();
 
@@ -84,7 +86,7 @@ app.use((req, res, next) => {
 app.use("/api/admin", adminRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/lead", leadRoutes);
-app.use("/api/salary", salaryRoute);
+app.use('/api/salaries', salaryRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/courses", Course);
 app.use("/api/expenses", expenseRoutes);
@@ -92,6 +94,8 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/leaves", leaveRoutes);
+app.use("/api/holidays", holidayRoutes);
+
 
 // ---------------- Serve Frontend in production ----------------
 if (process.env.NODE_ENV === "production") {
