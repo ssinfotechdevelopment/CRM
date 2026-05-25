@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const guestSchema = new mongoose.Schema(
     {
@@ -58,12 +58,10 @@ const guestSchema = new mongoose.Schema(
     }
 );
 
-// Compound index for unique guest per event (optional)
 guestSchema.index({ email: 1, eventId: 1 }, { unique: false });
 
-// Virtual for total count including companions
 guestSchema.virtual("totalCount").get(function () {
     return 1 + (this.numberOfCompanions || 0);
 });
 
-module.exports = mongoose.model("Guest", guestSchema);
+export default mongoose.model("Guest", guestSchema);

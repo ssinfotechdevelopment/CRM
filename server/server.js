@@ -19,7 +19,8 @@ import projectRoutes from "./routes/projectRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
-import holidayRoutes from "./routes/holidayRoutes.js";
+
+dotenv.config();
 
 // For ESM dirname usage
 const __filename = fileURLToPath(import.meta.url);
@@ -91,8 +92,6 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/leaves", leaveRoutes);
-app.use("/api/holidays", holidayRoutes);
-
 
 // ---------------- Serve Frontend in production ----------------
 if (process.env.NODE_ENV === "production") {
