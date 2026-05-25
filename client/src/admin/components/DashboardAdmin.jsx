@@ -14,7 +14,7 @@ import { IoLocationSharp, IoDocumentTextOutline, IoPeopleOutline, IoCalendarOutl
 import { GiExitDoor, GiHamburgerMenu } from "react-icons/gi";
 import { HiOutlineX } from "react-icons/hi";
 import { FiUsers, FiBookOpen, FiCalendar, FiBriefcase, FiTrendingUp, FiSettings, FiLogOut, FiUserPlus } from "react-icons/fi";
-import { MdOutlineDashboard, MdOutlineSchool, MdOutlineMonitor, MdOutlineEvent } from "react-icons/md";
+import { MdOutlineDashboard, MdOutlineSchool, MdOutlineMonitor, MdOutlineEvent, MdOutlineMonitorHeart } from "react-icons/md";
 // Import your components
 import StudentManagement from "../pages/StudentManagement";
 import EmployeeManagement from "../pages/EmployeeManagement";
@@ -27,7 +27,8 @@ import ExpenseManagement from "../pages/ExpenseManagement";
 import EmployeeLiveStatus from "../pages/EmployeeLiveStatus";
 import AdminLeaveDashboard from "../pages/AdminLeaveDashboard";
 import TaskAdmin from "../pages/TaskAdmin";
-import AdminEventGuestManager from "../pages/AdminEventGuestManager"; // Import the new component
+import AdminEventGuestManager from "../pages/AdminEventGuestManager";
+import AdminAttendanceMonitor from "../pages/AdminAttendanceMonitor"; 
 
 // Professional color palette
 const colors = {
@@ -100,13 +101,17 @@ const CloseIcon = ({ className = "w-5 h-5" }) => (
   <HiOutlineX className={className} />
 );
 
-// New Icons for Event & Guest
+// New Icons for Event & Guest & Attendance Monitor
 const EventIcon = ({ className = "w-5 h-5" }) => (
   <MdOutlineEvent className={className} />
 );
 
 const GuestIcon = ({ className = "w-5 h-5" }) => (
   <FiUserPlus className={className} />
+);
+
+const MonitorIcon = ({ className = "w-5 h-5" }) => (
+  <MdOutlineMonitorHeart className={className} />
 );
 
 /* ----------  MAIN DASHBOARD LAYOUT  ---------- */
@@ -124,6 +129,8 @@ const DashboardAdmin = () => {
 
   const menuItems = [
     { path: ".", label: "Dashboard", icon: DashboardIcon },
+    // 👈 ATTENDANCE MONITOR - SECOND MENU ITEM
+    { path: "attendance-monitor", label: "Attendance Monitor", icon: MonitorIcon },
     { path: "employees", label: "Employee Management", icon: EmployeeIcon },
     { path: "student-management", label: "Student Management", icon: StudentIcon },
     { path: "monitoring-task", label: "Monitoring Task", icon: MdOutlineMonitor },
@@ -135,7 +142,6 @@ const DashboardAdmin = () => {
     { path: "leadinsensitivemanagement", label: "Lead Management", icon: LeadIcon },
     { path: "courses", label: "Course Management", icon: CourseIcon },
     { path: "attendance", label: "Attendance", icon: AttendanceIcon },
-    // NEW: Event & Guest Management Section
     { path: "events", label: "Event Management", icon: EventIcon },
     { path: "reports", label: "Reports & Analytics", icon: ReportIcon },
     { path: "settings", label: "Settings", icon: SettingsIcon },
@@ -308,6 +314,10 @@ const DashboardAdmin = () => {
           <div className="max-w-7xl mx-auto">
             <Routes>
               <Route index element={<Dashboard />} />
+              
+              {/* 👇 NEW ROUTE - Attendance Monitor (2nd menu item) */}
+              <Route path="attendance-monitor" element={<AdminAttendanceMonitor />} />
+              
               <Route path="student-management" element={<StudentManagement />} />
               <Route path="employees" element={<EmployeeManagement />} />
               <Route path="monitoring-task" element={<TaskAdmin />} />
@@ -319,11 +329,8 @@ const DashboardAdmin = () => {
               <Route path="employeeLiveStatus" element={<EmployeeLiveStatus />} />
               <Route path="employeeLeaveStatus" element={<AdminLeaveDashboard />} />
               <Route path="leadinsensitivemanagement" element={<LeadInsensitiveManagement />} />
-
-              {/* NEW: Event & Guest Management Routes */}
               <Route path="events" element={<AdminEventGuestManager />} />
               <Route path="guests" element={<AdminEventGuestManager />} />
-
               <Route path="reports" element={
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                   <div className="flex items-center space-x-3 mb-6">

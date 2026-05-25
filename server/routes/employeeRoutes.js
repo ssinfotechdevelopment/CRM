@@ -38,5 +38,17 @@ router.get("/admin/employee/:id/tasks", getEmployeeTasks);
 router.get("/employee/:id/performance", getEmployeePerformance);
 router.get("/:id/tasks", getEmployeeTasks);
 router.get("/:id/attendance", getEmployeeAttendance);
+// In your attendance controller/routes
+router.get("/admin/all-attendance", protectAdmin, async (req, res) => {
+  try {
+    // Fetch all attendance records with populated employee details
+    const attendance = await Attendance.find()
+      .populate('employeeId', 'name email department position loginId')
+      .sort({ date: -1 });
+    res.json({ success: true, data: attendance });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;
