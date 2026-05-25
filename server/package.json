@@ -5,8 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon server.js",
-    "dev": "npm run dev"
+    "start": "nodemon server.js"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +28,6 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.14"
   }
 }

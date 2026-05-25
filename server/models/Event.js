@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const eventSchema = new mongoose.Schema(
     {
@@ -22,9 +22,16 @@ const eventSchema = new mongoose.Schema(
             required: [true, "Event location is required"],
             trim: true,
         },
-        photoUrl: {
-            type: String,
-            default: null,
+        // Multiple images — 5 to 10 per event
+        photos: {
+            type: [String],
+            default: [],
+            validate: {
+                validator: function (arr) {
+                    return arr.length <= 10;
+                },
+                message: "An event can have a maximum of 10 photos",
+            },
         },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
@@ -46,7 +53,6 @@ const eventSchema = new mongoose.Schema(
     }
 );
 
-// Index for better search performance
 eventSchema.index({ title: "text", description: "text" });
 
-module.exports = mongoose.model("Event", eventSchema);
+export default mongoose.model("Event", eventSchema);
