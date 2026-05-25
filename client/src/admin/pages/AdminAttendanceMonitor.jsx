@@ -1,631 +1,537 @@
-// src/admin/components/AdminAttendanceMonitor.jsx (Updated - with Database Storage)
-
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
-  Calendar,
-  Clock,
-  Search,
-  Download,
-  RefreshCw,
-  UserCheck,
-  UserX,
-  TrendingUp,
-  Clock3,
-  Filter,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Users,
-  CheckCircle,
-  XCircle,
-  Plus,
-  Trash2,
-  Gift,
-  Heart,
-  Briefcase,
-  Sun,
-  Edit,
-  Save,
+  Calendar, Clock, Search, Download, RefreshCw, UserCheck, UserX,
+  TrendingUp, Clock3, Filter, Eye, ChevronLeft, ChevronRight, X,
+  Users, CheckCircle, XCircle, Plus, Trash2, Gift, Heart, Briefcase,
+  Sun, Edit,
 } from "lucide-react";
-import { format, parseISO, isToday, isSameMonth, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWeekend, addMonths, subMonths } from "date-fns";
+import {
+  format, parseISO, isSameMonth, isSameDay, startOfMonth, endOfMonth,
+  eachDayOfInterval, getDay, isWeekend, addMonths, subMonths, isToday,
+} from "date-fns";
 import * as XLSX from "xlsx";
 import { toast, Toaster } from "react-hot-toast";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+const API = "https://crm-backend-v2.onrender.com/api";
+const ITEMS_PER_PAGE = 20;
+
+const HOLIDAY_TYPES = {
+  public:   { name: "Public Holiday", icon: Calendar,  color: "bg-red-100 text-red-700",    bg: "bg-red-50",    border: "border-red-200" },
+  religious:{ name: "Religious",       icon: Heart,     color: "bg-purple-100 text-purple-700", bg: "bg-purple-50", border: "border-purple-200" },
+  festival: { name: "Festival",        icon: Gift,      color: "bg-pink-100 text-pink-700",  bg: "bg-pink-50",   border: "border-pink-200" },
+  company:  { name: "Company Event",   icon: Briefcase, color: "bg-blue-100 text-blue-700",  bg: "bg-blue-50",   border: "border-blue-200" },
+  optional: { name: "Optional",        icon: Sun,       color: "bg-yellow-100 text-yellow-700", bg: "bg-yellow-50", border: "border-yellow-200" },
+};
+
+const DEPT_MAP = { 1:"Sales", 2:"Marketing", 3:"Development", 4:"HR", 5:"Finance", 6:"Operations" };
+const WEEK_DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getDeptName = (id) => DEPT_MAP[id] || id || "--";
+
+const fmtTime = (iso) => iso ? format(parseISO(iso), "hh:mm a") : "--";
+
+// ─── Skeleton Primitives ─────────────────────────────────────────────────────
+const Sh = ({ className = "" }) => (
+  <div className={`animate-pulse bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded ${className}`} />
+);
+
+// Stats row skeleton
+const SkeletonStats = () => (
+  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    {Array.from({ length: 5 }).map((_, i) => (
+      <div key={i} className="bg-white rounded-xl border p-4 flex items-center justify-between shadow-sm">
+        <div className="space-y-2 flex-1">
+          <Sh className="h-3 w-24" />
+          <Sh className="h-8 w-16" />
+        </div>
+        <Sh className="w-10 h-10 rounded-full flex-shrink-0" />
+      </div>
+    ))}
+  </div>
+);
+
+// Table skeleton (generic)
+const SkeletonTable = ({ cols = 7, rows = 8 }) => (
+  <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+    <div className="p-4 border-b bg-gray-50">
+      <Sh className="h-5 w-48" />
+    </div>
+    <div className="p-4 space-y-2">
+      <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+        {Array.from({ length: cols }).map((_, i) => <Sh key={i} className="h-5" />)}
+      </div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+          {Array.from({ length: cols }).map((__, j) => <Sh key={j} className="h-10" />)}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Leave panel skeleton
+const SkeletonLeavePanel = () => (
+  <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+    <div className="p-4 border-b bg-gray-50 space-y-3">
+      <Sh className="h-5 w-36" />
+      <div className="flex gap-2">
+        {[0,1,2].map(i => <Sh key={i} className="h-16 flex-1 rounded-lg" />)}
+      </div>
+    </div>
+    <div className="p-3 border-b flex gap-1">
+      {[0,1,2,3].map(i => <Sh key={i} className="h-8 flex-1 rounded-md" />)}
+    </div>
+    <div className="divide-y">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="p-4 space-y-2">
+          <div className="flex justify-between">
+            <Sh className="h-4 w-32" />
+            <Sh className="h-5 w-16 rounded-full" />
+          </div>
+          <Sh className="h-3 w-48" />
+          <Sh className="h-3 w-36" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Holiday calendar skeleton
+const SkeletonHolidayCalendar = () => (
+  <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+    <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+      <div className="flex items-center gap-4">
+        <Sh className="w-8 h-8 rounded-lg" />
+        <Sh className="h-6 w-36" />
+        <Sh className="w-8 h-8 rounded-lg" />
+      </div>
+      <Sh className="h-7 w-16 rounded-lg" />
+    </div>
+    <div className="p-4">
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {WEEK_DAYS.map((_, i) => <Sh key={i} className="h-8" />)}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 35 }).map((_, i) => <Sh key={i} className="min-h-[100px]" />)}
+      </div>
+    </div>
+    <div className="border-t p-4 space-y-2">
+      <Sh className="h-5 w-48" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex gap-3">
+          {[0,1,2,3,4,5].map(j => <Sh key={j} className="h-10 flex-1" />)}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Status Badges ────────────────────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const map = {
+    present:  "bg-green-100 text-green-700",
+    absent:   "bg-red-100 text-red-700",
+    late:     "bg-yellow-100 text-yellow-700",
+    approved: "bg-green-100 text-green-700",
+    rejected: "bg-red-100 text-red-700",
+    pending:  "bg-yellow-100 text-yellow-700",
+  };
+  const cls = map[status?.toLowerCase()] || "bg-gray-100 text-gray-600";
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
+      {status || "--"}
+    </span>
+  );
+};
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ icon: Icon, label, value, color }) => {
+  const cls = {
+    blue:   "bg-blue-100 text-blue-600",
+    orange: "bg-orange-100 text-orange-600",
+    green:  "bg-green-100 text-green-600",
+    red:    "bg-red-100 text-red-600",
+    purple: "bg-purple-100 text-purple-600",
+  }[color];
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between border border-gray-100">
+      <div>
+        <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+        <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+      </div>
+      <div className={`p-2 rounded-full ${cls}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+    </div>
+  );
+};
+
+// ─── Holiday Modal ────────────────────────────────────────────────────────────
+const HolidayModal = ({ title, color, onClose, onConfirm, confirmLabel, children }) => (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+      <div className={`${color} px-6 py-4 flex justify-between items-center rounded-t-2xl`}>
+        <h3 className="text-white font-semibold text-lg">{title}</h3>
+        <button onClick={onClose} className="text-white/80 hover:text-white"><X className="w-5 h-5" /></button>
+      </div>
+      <div className="p-6 space-y-4">{children}</div>
+      <div className="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-2xl">
+        <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-lg text-sm">Cancel</button>
+        <button onClick={onConfirm} className={`px-4 py-2 ${color} text-white rounded-lg text-sm`}>{confirmLabel}</button>
+      </div>
+    </div>
+  </div>
+);
+
+const Field = ({ label, children }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    {children}
+  </div>
+);
+
+const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 const AdminAttendanceMonitor = () => {
-  // ==================== ATTENDANCE STATE ====================
-  const [attendanceData, setAttendanceData] = useState([]);
+  // ── Attendance state ───────────────────────────────────────────────────────
+  const [attendanceData, setAttendanceData]   = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("today");
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [showDetailModal, setShowDetailModal] = useState(null);
-  const [selectedEmployeeDetails, setSelectedEmployeeDetails] = useState(null);
-  const [activeTab, setActiveTab] = useState("attendance");
-  
-  // ==================== LEAVE REQUESTS STATE ====================
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [leaveLoading, setLeaveLoading] = useState(false);
-  const [leaveFilter, setLeaveFilter] = useState("all");
-  
-  // ==================== HOLIDAY STATE (DATABASE STORED) ====================
-  const [holidays, setHolidays] = useState([]);
-  const [holidayLoading, setHolidayLoading] = useState(false);
-  const [showAddHolidayModal, setShowAddHolidayModal] = useState(false);
-  const [showEditHolidayModal, setShowEditHolidayModal] = useState(false);
-  const [showDeleteHolidayModal, setShowDeleteHolidayModal] = useState(false);
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
+  const [refreshing, setRefreshing]           = useState(false);
+  const [searchTerm, setSearchTerm]           = useState("");
+  const [dateFilter, setDateFilter]           = useState("today");
+  const [selectedMonth, setSelectedMonth]     = useState(new Date());
+  const [currentPage, setCurrentPage]         = useState(1);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [activeTab, setActiveTab]             = useState("attendance");
+  const [summaryStats, setSummaryStats]       = useState({ totalEmployees:0, clockedInNow:0, completedToday:0, absentToday:0, avgHoursToday:0 });
+
+  // ── Leave state ────────────────────────────────────────────────────────────
+  const [leaveRequests, setLeaveRequests]     = useState([]);
+  const [loadingLeaves, setLoadingLeaves]     = useState(true);
+  const [leaveFilter, setLeaveFilter]         = useState("all");
+
+  // ── Holiday state ──────────────────────────────────────────────────────────
+  const [holidays, setHolidays]               = useState([]);
+  const [loadingHolidays, setLoadingHolidays] = useState(true);
+  const [holidayMonth, setHolidayMonth]       = useState(new Date());
+  const [showAddModal, setShowAddModal]       = useState(false);
+  const [showEditModal, setShowEditModal]     = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedHoliday, setSelectedHoliday] = useState(null);
-  const [holidayMonth, setHolidayMonth] = useState(new Date());
-  const [newHoliday, setNewHoliday] = useState({
-    name: "",
-    date: "",
-    type: "public",
-    description: "",
-  });
-  
-  const [summaryStats, setSummaryStats] = useState({
-    totalEmployees: 0,
-    clockedInNow: 0,
-    completedToday: 0,
-    absentToday: 0,
-    avgHoursToday: 0,
-  });
+  const [newHoliday, setNewHoliday]           = useState({ name:"", date:"", type:"public", description:"" });
 
-  const token = localStorage.getItem("adminToken");
+  const token      = localStorage.getItem("adminToken");
+  const hasFetched = useRef(false);
 
-  // Holiday Types
-  const holidayTypes = {
-    public: { name: "Public Holiday", icon: Calendar, color: "bg-red-100 text-red-700", bg: "bg-red-50", border: "border-red-200" },
-    religious: { name: "Religious", icon: Heart, color: "bg-purple-100 text-purple-700", bg: "bg-purple-50", border: "border-purple-200" },
-    festival: { name: "Festival", icon: Gift, color: "bg-pink-100 text-pink-700", bg: "bg-pink-50", border: "border-pink-200" },
-    company: { name: "Company Event", icon: Briefcase, color: "bg-blue-100 text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
-    optional: { name: "Optional", icon: Sun, color: "bg-yellow-100 text-yellow-700", bg: "bg-yellow-50", border: "border-yellow-200" },
-  };
-
-  // ==================== FETCH HOLIDAYS FROM DATABASE ====================
-  const fetchHolidays = useCallback(async () => {
+  // ── Parallel initial data load ─────────────────────────────────────────────
+  const fetchAllData = useCallback(async (isRefresh = false) => {
     if (!token) return;
-    setHolidayLoading(true);
-    try {
-      const response = await fetch("https://crm-backend-v2.onrender.com/api/holidays/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        let holidaysList = [];
-        if (Array.isArray(data)) holidaysList = data;
-        else if (data.holidays && Array.isArray(data.holidays)) holidaysList = data.holidays;
-        else if (data.data && Array.isArray(data.data)) holidaysList = data.data;
-        setHolidays(holidaysList);
-        console.log("✅ Holidays loaded from database:", holidaysList.length);
-      } else {
-        console.error("Failed to fetch holidays");
-        setHolidays([]);
-      }
-    } catch (error) {
-      console.error("Error fetching holidays:", error);
-      setHolidays([]);
-    } finally {
-      setHolidayLoading(false);
-    }
-  }, [token]);
+    if (isRefresh) setRefreshing(true);
 
-  // ==================== ADD HOLIDAY TO DATABASE ====================
-  const addHoliday = async () => {
-    if (!newHoliday.name || !newHoliday.date) {
-      toast.error("Please fill holiday name and date");
-      return;
-    }
+    // Fire all three in parallel
+    await Promise.all([
+      fetchAttendance(isRefresh),
+      fetchLeaves(isRefresh),
+      fetchHolidays(isRefresh),
+    ]);
 
-    try {
-      const response = await fetch("https://crm-backend-v2.onrender.com/api/holidays/add", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(newHoliday),
-      });
+    if (isRefresh) setRefreshing(false);
+  }, [token]); // eslint-disable-line
 
-      const data = await response.json();
-      
-      if (response.ok) {
-        toast.success("✅ Holiday added to database!");
-        setShowAddHolidayModal(false);
-        setNewHoliday({ name: "", date: "", type: "public", description: "" });
-        fetchHolidays(); // Refresh holidays from database
-      } else {
-        toast.error(data.error || "Failed to add holiday");
-      }
-    } catch (error) {
-      console.error("Error adding holiday:", error);
-      toast.error("Network error");
-    }
-  };
-
-  // ==================== UPDATE HOLIDAY IN DATABASE ====================
-  const updateHoliday = async () => {
-    if (!selectedHoliday) return;
-    
-    try {
-      const response = await fetch(`https://crm-backend-v2.onrender.com/api/holidays/update/${selectedHoliday._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(selectedHoliday),
-      });
-
-      if (response.ok) {
-        toast.success("✅ Holiday updated in database!");
-        setShowEditHolidayModal(false);
-        setSelectedHoliday(null);
-        fetchHolidays();
-      } else {
-        toast.error("Failed to update holiday");
-      }
-    } catch (error) {
-      console.error("Error updating holiday:", error);
-      toast.error("Network error");
-    }
-  };
-
-  // ==================== DELETE HOLIDAY FROM DATABASE ====================
-  const deleteHoliday = async () => {
-    if (!selectedHoliday) return;
-
-    try {
-      const response = await fetch(`https://crm-backend-v2.onrender.com/api/holidays/delete/${selectedHoliday._id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        toast.success("✅ Holiday deleted from database!");
-        setShowDeleteHolidayModal(false);
-        setSelectedHoliday(null);
-        fetchHolidays();
-      } else {
-        toast.error("Failed to delete holiday");
-      }
-    } catch (error) {
-      console.error("Error deleting holiday:", error);
-      toast.error("Network error");
-    }
-  };
-
-  // Get holiday for a specific date
-  const getHolidayForDate = (date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
-    return holidays.find(h => h.date === dateStr);
-  };
-
-  // Calendar helpers
-  const getDaysInMonth = () => {
-    const start = startOfMonth(holidayMonth);
-    const end = endOfMonth(holidayMonth);
-    const days = eachDayOfInterval({ start, end });
-    const leadingBlanks = getDay(start);
-    return { days, leadingBlanks };
-  };
-
-  const { days: holidayDays, leadingBlanks: holidayLeadingBlanks } = getDaysInMonth();
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  const goToPreviousHolidayMonth = () => setHolidayMonth(prev => subMonths(prev, 1));
-  const goToNextHolidayMonth = () => setHolidayMonth(prev => addMonths(prev, 1));
-  const goToTodayHoliday = () => setHolidayMonth(new Date());
-
-  // ==================== FETCH LEAVE REQUESTS ====================
-  const fetchLeaveRequests = useCallback(async () => {
+  // ── Fetch attendance (parallel per-employee) ───────────────────────────────
+  const fetchAttendance = async (isRefresh = false) => {
     if (!token) return;
-    setLeaveLoading(true);
+    if (!isRefresh) setLoadingAttendance(true);
+
     try {
-      const response = await fetch("https://crm-backend-v2.onrender.com/api/leaves/all", {
+      // Step 1 — employee list
+      const empRes = await fetch(`${API}/employee/get/employee`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        let leaves = [];
-        if (Array.isArray(data)) leaves = data;
-        else if (data.leaves && Array.isArray(data.leaves)) leaves = data.leaves;
-        else if (data.data && Array.isArray(data.data)) leaves = data.data;
-        setLeaveRequests(leaves);
-      } else {
-        setLeaveRequests([]);
-      }
-    } catch (error) {
-      console.error("Error fetching leave requests:", error);
-      setLeaveRequests([]);
-    } finally {
-      setLeaveLoading(false);
-    }
-  }, [token]);
+      if (!empRes.ok) throw new Error("Failed to load employees");
+      const empJson = await empRes.json();
+      const employees = Array.isArray(empJson) ? empJson : empJson.employees || empJson.data || [];
 
-  const approveLeave = async (leaveId) => {
-    try {
-      const response = await fetch(`https://crm-backend-v2.onrender.com/api/leaves/${leaveId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: "approved" }),
-      });
-
-      if (response.ok) {
-        toast.success("Leave request approved");
-        fetchLeaveRequests();
-      } else {
-        toast.error("Failed to approve leave");
-      }
-    } catch (error) {
-      toast.error("Network error");
-    }
-  };
-
-  const rejectLeave = async (leaveId) => {
-    try {
-      const response = await fetch(`https://crm-backend-v2.onrender.com/api/leaves/${leaveId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: "rejected" }),
-      });
-
-      if (response.ok) {
-        toast.success("Leave request rejected");
-        fetchLeaveRequests();
-      } else {
-        toast.error("Failed to reject leave");
-      }
-    } catch (error) {
-      toast.error("Network error");
-    }
-  };
-
-  // ==================== FETCH ATTENDANCE DATA ====================
-  const fetchAllEmployees = useCallback(async () => {
-    if (!token) return [];
-    try {
-      const response = await fetch("https://crm-backend-v2.onrender.com/api/employee/get/employee", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        return Array.isArray(data) ? data : data.employees || data.data || [];
-      }
-    } catch (error) {
-      console.error("Error fetching employees:", error);
-    }
-    return [];
-  }, [token]);
-
-  const fetchEmployeeAttendance = async (employeeId, token) => {
-    try {
-      const response = await fetch(
-        `https://crm-backend-v2.onrender.com/api/attendance/admin/employee/${employeeId}/attendance`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        let records = [];
-        if (Array.isArray(data)) records = data;
-        else if (data.attendance && Array.isArray(data.attendance)) records = data.attendance;
-        else if (data.data && Array.isArray(data.data)) records = data.data;
-        return records;
-      }
-    } catch (error) {
-      console.error(`Error fetching attendance:`, error);
-    }
-    return [];
-  };
-
-  const fetchAllAttendance = useCallback(async () => {
-    if (!token) {
-      toast.error("Admin not logged in");
-      return;
-    }
-    
-    setLoading(true);
-    toast.loading("Fetching attendance data...", { id: "fetch-attendance" });
-    
-    try {
-      const employees = await fetchAllEmployees();
-      
       if (employees.length === 0) {
-        toast.error("No employees found", { id: "fetch-attendance" });
-        setLoading(false);
+        setAttendanceData([]);
+        setFilteredRecords([]);
+        setLoadingAttendance(false);
         return;
       }
-      
-      const allAttendanceRecords = [];
-      
-      for (const employee of employees) {
-        const attendanceRecords = await fetchEmployeeAttendance(employee._id, token);
-        
-        attendanceRecords.forEach(record => {
-          allAttendanceRecords.push({
-            _id: record._id,
-            employeeId: {
-              _id: employee._id,
-              name: employee.name,
-              email: employee.email,
-              department: employee.department,
-              position: employee.position,
-              loginId: employee.loginId,
-            },
-            date: record.date,
-            clockIn: record.clockIn,
-            clockOut: record.clockOut,
-            hoursWorked: record.hoursWorked || 0,
-            status: record.status || (record.clockIn && record.clockOut ? "Present" : record.clockIn ? "Late" : "Absent"),
-            location: record.location,
-          });
-        });
-      }
-      
-      allAttendanceRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setAttendanceData(allAttendanceRecords);
-      applyFilters(allAttendanceRecords, searchTerm, dateFilter, selectedMonth);
-      toast.success(`Loaded ${allAttendanceRecords.length} attendance records`, { id: "fetch-attendance" });
-      
-    } catch (error) {
-      console.error("Error fetching attendance:", error);
-      toast.error("Failed to load attendance data", { id: "fetch-attendance" });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [token, fetchAllEmployees, searchTerm, dateFilter, selectedMonth]);
 
-  const applyFilters = (data, term, filterType, month) => {
-    let filtered = [...data];
+      // Step 2 — all employees' attendance in parallel
+      const results = await Promise.all(
+        employees.map((emp) =>
+          fetch(`${API}/attendance/admin/employee/${emp._id}/attendance`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data) => {
+              const records = Array.isArray(data) ? data : data.attendance || data.data || [];
+              return records.map((rec) => ({
+                _id:        rec._id,
+                employeeId: {
+                  _id:        emp._id,
+                  name:       emp.name,
+                  email:      emp.email,
+                  department: emp.department,
+                  position:   emp.position,
+                  loginId:    emp.loginId,
+                },
+                date:        rec.date,
+                clockIn:     rec.clockIn,
+                clockOut:    rec.clockOut,
+                hoursWorked: rec.hoursWorked || 0,
+                status:      rec.status || (rec.clockIn && rec.clockOut ? "Present" : rec.clockIn ? "Late" : "Absent"),
+                location:    rec.location,
+              }));
+            })
+            .catch(() => [])
+        )
+      );
+
+      const all = results.flat().sort((a, b) => new Date(b.date) - new Date(a.date));
+      setAttendanceData(all);
+    } catch {
+      toast.error("Failed to load attendance");
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  // ── Fetch leaves ───────────────────────────────────────────────────────────
+  const fetchLeaves = async (isRefresh = false) => {
+    if (!token) return;
+    if (!isRefresh) setLoadingLeaves(true);
+    try {
+      const res  = await fetch(`${API}/leaves/all`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data.leaves || data.data || [];
+      setLeaveRequests(list);
+    } catch {
+      setLeaveRequests([]);
+    } finally {
+      setLoadingLeaves(false);
+    }
+  };
+
+  // ── Fetch holidays ─────────────────────────────────────────────────────────
+  const fetchHolidays = async (isRefresh = false) => {
+    if (!token) return;
+    if (!isRefresh) setLoadingHolidays(true);
+    try {
+      const res  = await fetch(`${API}/holidays/all`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data.holidays || data.data || [];
+      setHolidays(list);
+    } catch {
+      setHolidays([]);
+    } finally {
+      setLoadingHolidays(false);
+    }
+  };
+
+  // ── Initial load ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchAllData(false);
+    }
+  }, [fetchAllData]);
+
+  // ── Filter + stats whenever source data or filter changes ──────────────────
+  useEffect(() => {
+    if (!attendanceData.length) return;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    switch (filterType) {
-      case "today":
-        filtered = filtered.filter((rec) => isSameDay(parseISO(rec.date), today));
-        break;
-      case "month":
-        filtered = filtered.filter((rec) => isSameMonth(parseISO(rec.date), month));
-        break;
-      default:
-        break;
-    }
+    let filtered = attendanceData.filter((rec) => {
+      if (dateFilter === "today")  return isSameDay(parseISO(rec.date), today);
+      if (dateFilter === "month")  return isSameMonth(parseISO(rec.date), selectedMonth);
+      return true;
+    });
 
-    if (term.trim() !== "") {
-      const lowerTerm = term.toLowerCase();
-      filtered = filtered.filter((rec) => {
-        const emp = rec.employeeId;
-        return (
-          emp?.name?.toLowerCase().includes(lowerTerm) ||
-          emp?.email?.toLowerCase().includes(lowerTerm) ||
-          emp?.loginId?.toLowerCase().includes(lowerTerm) ||
-          emp?.position?.toLowerCase().includes(lowerTerm)
-        );
-      });
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      filtered = filtered.filter(({ employeeId: e }) =>
+        e?.name?.toLowerCase().includes(q) ||
+        e?.email?.toLowerCase().includes(q) ||
+        e?.loginId?.toLowerCase().includes(q) ||
+        e?.position?.toLowerCase().includes(q)
+      );
     }
 
     setFilteredRecords(filtered);
-    calculateStats(data, filterType, month);
-  };
+    setCurrentPage(1);
 
-  const calculateStats = (allData, filterType, month) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayRecords = allData.filter((rec) => isSameDay(parseISO(rec.date), today));
-
-    const uniqueEmpIds = new Set();
-    todayRecords.forEach((rec) => {
-      if (rec.employeeId?._id) uniqueEmpIds.add(rec.employeeId._id);
-    });
-
-    let clockedInCount = 0;
-    let completedCount = 0;
-    let totalHours = 0;
-
-    todayRecords.forEach((rec) => {
-      if (rec.clockIn) clockedInCount++;
-      if (rec.clockIn && rec.clockOut) {
-        completedCount++;
-        totalHours += rec.hoursWorked || 0;
-      }
-    });
-
-    const allUniqueEmployees = new Set();
-    allData.forEach((rec) => {
-      if (rec.employeeId?._id) allUniqueEmployees.add(rec.employeeId._id);
-    });
-    const totalEmployees = allUniqueEmployees.size || 0;
-    const absentTodayCount = Math.max(0, totalEmployees - uniqueEmpIds.size);
+    // stats (always from today's data across full set)
+    const todayRecs = attendanceData.filter((rec) => isSameDay(parseISO(rec.date), today));
+    const presentIDs = new Set(todayRecs.filter((r) => r.clockIn).map((r) => r.employeeId._id));
+    const allIDs     = new Set(attendanceData.map((r) => r.employeeId._id));
+    const completed  = todayRecs.filter((r) => r.clockIn && r.clockOut);
+    const totalHrs   = completed.reduce((s, r) => s + (r.hoursWorked || 0), 0);
 
     setSummaryStats({
-      totalEmployees: totalEmployees,
-      clockedInNow: clockedInCount,
-      completedToday: completedCount,
-      absentToday: absentTodayCount,
-      avgHoursToday: completedCount > 0 ? parseFloat((totalHours / completedCount).toFixed(1)) : 0,
+      totalEmployees: allIDs.size,
+      clockedInNow:   presentIDs.size,
+      completedToday: completed.length,
+      absentToday:    Math.max(0, allIDs.size - presentIDs.size),
+      avgHoursToday:  completed.length ? parseFloat((totalHrs / completed.length).toFixed(1)) : 0,
     });
-  };
+  }, [attendanceData, searchTerm, dateFilter, selectedMonth]);
 
-  const uniqueEmployeesForMonth = useMemo(() => {
+  // ── Month summary (for month view) ────────────────────────────────────────
+  const employeeSummaries = useMemo(() => {
     if (dateFilter !== "month") return [];
-    
-    const employees = new Map();
-    filteredRecords.forEach(record => {
-      if (!employees.has(record.employeeId._id)) {
-        employees.set(record.employeeId._id, {
-          ...record.employeeId,
-          records: []
-        });
-      }
-      employees.get(record.employeeId._id).records.push(record);
+    const map = new Map();
+    filteredRecords.forEach((rec) => {
+      const id = rec.employeeId._id;
+      if (!map.has(id)) map.set(id, { ...rec.employeeId, records: [] });
+      map.get(id).records.push(rec);
     });
-    
-    return Array.from(employees.values()).map(emp => {
-      const records = emp.records;
-      const presentDays = records.filter(r => r.status === "Present").length;
-      const absentDays = records.filter(r => r.status === "Absent").length;
-      const lateDays = records.filter(r => r.status === "Late").length;
-      const totalHours = records.reduce((sum, r) => sum + (r.hoursWorked || 0), 0);
-      const totalDays = records.length;
-      const attendancePercent = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
-      
-      return {
-        ...emp,
-        presentDays,
-        absentDays,
-        lateDays,
-        totalHours,
-        attendancePercent,
-        records
-      };
+    return Array.from(map.values()).map((emp) => {
+      const present  = emp.records.filter((r) => r.status === "Present").length;
+      const absent   = emp.records.filter((r) => r.status === "Absent").length;
+      const late     = emp.records.filter((r) => r.status === "Late").length;
+      const totalHrs = emp.records.reduce((s, r) => s + (r.hoursWorked || 0), 0);
+      const pct      = emp.records.length ? Math.round((present / emp.records.length) * 100) : 0;
+      return { ...emp, present, absent, late, totalHrs, pct };
     });
   }, [filteredRecords, dateFilter]);
 
-  const filteredLeaves = useMemo(() => {
-    if (leaveFilter === "all") return leaveRequests;
-    return leaveRequests.filter(leave => leave.status === leaveFilter);
-  }, [leaveRequests, leaveFilter]);
+  // ── Leave helpers ──────────────────────────────────────────────────────────
+  const filteredLeaves = useMemo(() =>
+    leaveFilter === "all" ? leaveRequests : leaveRequests.filter((l) => l.status === leaveFilter),
+    [leaveRequests, leaveFilter]
+  );
 
-  const pendingCount = leaveRequests.filter(l => l.status === "pending").length;
-  const approvedCount = leaveRequests.filter(l => l.status === "approved").length;
-  const rejectedCount = leaveRequests.filter(l => l.status === "rejected").length;
+  const pendingCount  = leaveRequests.filter((l) => l.status === "pending").length;
+  const approvedCount = leaveRequests.filter((l) => l.status === "approved").length;
+  const rejectedCount = leaveRequests.filter((l) => l.status === "rejected").length;
 
-  const handleViewDetails = (employee) => {
-    setSelectedEmployeeDetails(employee);
-    setShowDetailModal(true);
+  const updateLeaveStatus = async (id, status) => {
+    try {
+      const res = await fetch(`${API}/leaves/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) { toast.success(`Leave ${status}`); fetchLeaves(true); }
+      else toast.error(`Failed to ${status} leave`);
+    } catch { toast.error("Network error"); }
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchAllAttendance();
-    fetchLeaveRequests();
-    fetchHolidays();
+  // ── Holiday helpers ────────────────────────────────────────────────────────
+  const holidayMap = useMemo(() => {
+    const m = new Map();
+    holidays.forEach((h) => m.set(h.date, h));
+    return m;
+  }, [holidays]);
+
+  const getHolidayForDate = (date) => holidayMap.get(format(date, "yyyy-MM-dd")) || null;
+
+  const { days: calDays, leadingBlanks: calBlanks } = useMemo(() => {
+    const start = startOfMonth(holidayMonth);
+    return {
+      days: eachDayOfInterval({ start, end: endOfMonth(holidayMonth) }),
+      leadingBlanks: getDay(start),
+    };
+  }, [holidayMonth]);
+
+  const addHoliday = async () => {
+    if (!newHoliday.name || !newHoliday.date) { toast.error("Name and date are required"); return; }
+    try {
+      const res = await fetch(`${API}/holidays/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(newHoliday),
+      });
+      const data = await res.json();
+      if (res.ok) { toast.success("Holiday added"); setShowAddModal(false); setNewHoliday({ name:"", date:"", type:"public", description:"" }); fetchHolidays(true); }
+      else toast.error(data.error || "Failed to add holiday");
+    } catch { toast.error("Network error"); }
   };
 
-  const handlePreviousMonth = () => {
-    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const updateHoliday = async () => {
+    if (!selectedHoliday) return;
+    try {
+      const res = await fetch(`${API}/holidays/update/${selectedHoliday._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(selectedHoliday),
+      });
+      if (res.ok) { toast.success("Holiday updated"); setShowEditModal(false); setSelectedHoliday(null); fetchHolidays(true); }
+      else toast.error("Failed to update holiday");
+    } catch { toast.error("Network error"); }
   };
-  
-  const handleNextMonth = () => {
-    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+
+  const deleteHoliday = async () => {
+    if (!selectedHoliday) return;
+    try {
+      const res = await fetch(`${API}/holidays/delete/${selectedHoliday._id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) { toast.success("Holiday deleted"); setShowDeleteModal(false); setSelectedHoliday(null); fetchHolidays(true); }
+      else toast.error("Failed to delete holiday");
+    } catch { toast.error("Network error"); }
   };
 
-  useEffect(() => {
-    fetchAllAttendance();
-    fetchLeaveRequests();
-    fetchHolidays();
-  }, []);
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const totalPages       = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  useEffect(() => {
-    if (attendanceData.length > 0) {
-      applyFilters(attendanceData, searchTerm, dateFilter, selectedMonth);
-    }
-  }, [searchTerm, dateFilter, selectedMonth, attendanceData]);
-
+  // ── Export ─────────────────────────────────────────────────────────────────
   const exportToExcel = () => {
-    if (filteredRecords.length === 0) {
-      toast.error("No records to export");
-      return;
-    }
-
-    const exportData = filteredRecords.map((rec) => ({
-      "Employee Name": rec.employeeId?.name || "Unknown",
-      "Email": rec.employeeId?.email || "-",
-      "Department": getDepartmentName(rec.employeeId?.department),
-      "Position": rec.employeeId?.position || "-",
-      "Date": format(parseISO(rec.date), "dd MMM yyyy"),
-      "Clock In": rec.clockIn ? format(parseISO(rec.clockIn), "hh:mm:ss a") : "--",
-      "Clock Out": rec.clockOut ? format(parseISO(rec.clockOut), "hh:mm:ss a") : "--",
-      "Hours Worked": rec.hoursWorked ? rec.hoursWorked.toFixed(2) : "0",
-      "Status": rec.status,
+    if (!filteredRecords.length) { toast.error("No records to export"); return; }
+    const data = filteredRecords.map((r) => ({
+      "Employee Name": r.employeeId?.name || "-",
+      Email:           r.employeeId?.email || "-",
+      Department:      getDeptName(r.employeeId?.department),
+      Position:        r.employeeId?.position || "-",
+      Date:            format(parseISO(r.date), "dd MMM yyyy"),
+      "Clock In":      r.clockIn  ? format(parseISO(r.clockIn),  "hh:mm:ss a") : "--",
+      "Clock Out":     r.clockOut ? format(parseISO(r.clockOut), "hh:mm:ss a") : "--",
+      "Hours Worked":  r.hoursWorked ? r.hoursWorked.toFixed(2) : "0",
+      Status:          r.status,
     }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
+    const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance_Monitor");
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
     XLSX.writeFile(wb, `attendance_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
     toast.success("Exported successfully");
   };
 
-  const formatTime = (isoString) => {
-    if (!isoString) return "--";
-    return format(parseISO(isoString), "hh:mm a");
-  };
+  // ── Initial loading state (all three still fetching) ──────────────────────
+  const isInitialLoad = loadingAttendance && loadingLeaves && loadingHolidays;
 
-  const getDepartmentName = (deptId) => {
-    const departments = {
-      1: "Sales", 2: "Marketing", 3: "Development",
-      4: "HR", 5: "Finance", 6: "Operations"
-    };
-    return departments[deptId] || deptId || "--";
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status?.toLowerCase()) {
-      case "present":
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Present</span>;
-      case "absent":
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Absent</span>;
-      case "late":
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Late</span>;
-      default:
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{status || "--"}</span>;
-    }
-  };
-
-  const getLeaveStatusBadge = (status) => {
-    switch (status) {
-      case "approved":
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Approved</span>;
-      case "rejected":
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Rejected</span>;
-      case "pending":
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{status}</span>;
-    }
-  };
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
-  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
-  const paginatedRecords = filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, dateFilter, selectedMonth]);
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       <Toaster position="top-right" />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 p-4 md:p-6">
         <div className="max-w-[1600px] mx-auto">
-          {/* Header */}
+
+          {/* ── Header ──────────────────────────────────────────────────────── */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
                 <Clock className="w-7 h-7 text-indigo-600" />
                 Employee Management Dashboard
               </h1>
-              <p className="text-gray-500 text-sm mt-1">Attendance, Leave Requests & Holiday Calendar (Data stored in Database)</p>
+              <p className="text-gray-500 text-sm mt-1">Attendance · Leave Requests · Holiday Calendar</p>
             </div>
             <div className="flex gap-3">
               <button
-                onClick={handleRefresh}
+                onClick={() => fetchAllData(true)}
                 disabled={refreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition text-gray-700 text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition text-gray-700 text-sm disabled:opacity-60"
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
@@ -641,205 +547,199 @@ const AdminAttendanceMonitor = () => {
               )}
               {activeTab === "holidays" && (
                 <button
-                  onClick={() => setShowAddHolidayModal(true)}
+                  onClick={() => setShowAddModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition text-sm"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Holiday (Save to DB)
+                  Add Holiday
                 </button>
               )}
             </div>
           </div>
 
-          {/* Stats Cards - Only show in attendance tab */}
+          {/* ── Stats Cards ──────────────────────────────────────────────────── */}
           {activeTab === "attendance" && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-              <StatCard icon={UserCheck} label="Total Employees" value={summaryStats.totalEmployees} color="blue" />
-              <StatCard icon={Clock3} label="Clocked In Today" value={summaryStats.clockedInNow} color="orange" />
-              <StatCard icon={TrendingUp} label="Completed Today" value={summaryStats.completedToday} color="green" />
-              <StatCard icon={UserX} label="Absent Today" value={summaryStats.absentToday} color="red" />
-              <StatCard icon={Calendar} label="Avg Hours (Today)" value={`${summaryStats.avgHoursToday}h`} color="purple" />
-            </div>
+            isInitialLoad ? <SkeletonStats /> : (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <StatCard icon={UserCheck} label="Total Employees"  value={summaryStats.totalEmployees}                  color="blue" />
+                <StatCard icon={Clock3}    label="Clocked In Today" value={summaryStats.clockedInNow}                    color="orange" />
+                <StatCard icon={TrendingUp} label="Completed Today" value={summaryStats.completedToday}                  color="green" />
+                <StatCard icon={UserX}     label="Absent Today"     value={summaryStats.absentToday}                     color="red" />
+                <StatCard icon={Calendar}  label="Avg Hours Today"  value={`${summaryStats.avgHoursToday}h`}             color="purple" />
+              </div>
+            )
           )}
 
-          {/* Tabs */}
+          {/* ── Tab Switcher ──────────────────────────────────────────────────── */}
           <div className="bg-white rounded-xl shadow-md p-4 mb-6 border border-gray-100">
             <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab("attendance")}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                  activeTab === "attendance"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                📋 Attendance & Leaves
-              </button>
-              <button
-                onClick={() => setActiveTab("holidays")}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                  activeTab === "holidays"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                📅 Holiday Calendar (Database)
-              </button>
+              {[
+                { id: "attendance", label: "📋 Attendance & Leaves" },
+                { id: "holidays",   label: "📅 Holiday Calendar" },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                    activeTab === id ? "bg-indigo-600 text-white shadow" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* ==================== ATTENDANCE TAB CONTENT ==================== */}
+          {/* ════════════════ ATTENDANCE TAB ════════════════════════════════════ */}
           {activeTab === "attendance" && (
             <>
-              {/* Filters */}
+              {/* Filters bar */}
               <div className="bg-white rounded-xl shadow-md p-4 mb-6 border border-gray-100">
                 <div className="flex flex-col md:flex-row gap-4 justify-between">
                   <div className="flex flex-wrap gap-2 items-center">
                     <Filter className="w-4 h-4 text-gray-400" />
                     <span className="text-sm font-medium text-gray-600">View:</span>
                     <div className="flex bg-gray-100 rounded-lg p-1">
-                      <button
-                        onClick={() => setDateFilter("today")}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition ${
-                          dateFilter === "today"
-                            ? "bg-indigo-600 text-white shadow"
-                            : "text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        Today
-                      </button>
-                      <button
-                        onClick={() => setDateFilter("month")}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition ${
-                          dateFilter === "month"
-                            ? "bg-indigo-600 text-white shadow"
-                            : "text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        Month View
-                      </button>
+                      {["today","month"].map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setDateFilter(f)}
+                          className={`px-3 py-1 text-xs font-medium rounded-md transition capitalize ${
+                            dateFilter === f ? "bg-indigo-600 text-white shadow" : "text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          {f === "today" ? "Today" : "Month View"}
+                        </button>
+                      ))}
                     </div>
-                    
                     {dateFilter === "month" && (
                       <div className="flex items-center gap-2 ml-2">
-                        <button onClick={handlePreviousMonth} className="p-1 hover:bg-gray-100 rounded">
+                        <button onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))} className="p-1 hover:bg-gray-100 rounded">
                           <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <span className="text-sm font-medium text-gray-700 min-w-[100px] text-center">
+                        <span className="text-sm font-medium text-gray-700 min-w-[110px] text-center">
                           {format(selectedMonth, "MMMM yyyy")}
                         </span>
-                        <button onClick={handleNextMonth} className="p-1 hover:bg-gray-100 rounded">
+                        <button onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))} className="p-1 hover:bg-gray-100 rounded">
                           <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
                     )}
                   </div>
-                  
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search by name, email, ID..."
+                      placeholder="Search by name, email, ID…"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full md:w-72 text-sm focus:ring-2 focus:ring-indigo-300"
+                      className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full md:w-72 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Two Column Layout for Table and Leaves */}
+              {/* Two-column: table + leaves */}
               <div className="grid lg:grid-cols-3 gap-6">
-                {/* Attendance Table Section */}
+
+                {/* ── Attendance Table ─────────────────────────────────────── */}
                 <div className="lg:col-span-2">
-                  {dateFilter === "today" && (
+                  {loadingAttendance ? (
+                    <SkeletonTable cols={dateFilter === "today" ? 7 : 9} rows={8} />
+                  ) : dateFilter === "today" ? (
                     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className="bg-gray-50 border-b">
                             <tr>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-600">Employee</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-600">Dept / Role</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-600">Clock In</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-600">Clock Out</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-600">Hours</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                              <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
+                              {["Employee","Dept / Role","Clock In","Clock Out","Hours","Status","Actions"].map((h) => (
+                                <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {loading ? (
-                              [...Array(6)].map((_, i) => (
-                                <tr key={i}>
-                                  <td colSpan={7} className="px-4 py-6 text-center">
-                                    <div className="flex justify-center items-center gap-2 text-gray-400">
-                                      <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            ) : paginatedRecords.length === 0 ? (
+                            {paginatedRecords.length === 0 ? (
                               <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No records found</td></tr>
-                            ) : (
-                              paginatedRecords.map((record, idx) => (
-                                <tr key={record._id || idx} className="hover:bg-gray-50 transition">
-                                  <td className="px-4 py-3">
-                                    <p className="font-medium text-gray-800">{record.employeeId?.name || "—"}</p>
-                                    <p className="text-xs text-gray-400">{record.employeeId?.email || ""}</p>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">{getDepartmentName(record.employeeId?.department)}</span>
-                                    <p className="text-xs text-gray-500 mt-1">{record.employeeId?.position || ""}</p>
-                                  </td>
-                                  <td className="px-4 py-3 font-mono text-sm">{formatTime(record.clockIn)}</td>
-                                  <td className="px-4 py-3 font-mono text-sm">{formatTime(record.clockOut)}</td>
-                                  <td className="px-4 py-3">{record.hoursWorked ? `${record.hoursWorked.toFixed(1)} hrs` : "--"}</td>
-                                  <td className="px-4 py-3">{getStatusBadge(record.status)}</td>
-                                  <td className="px-4 py-3 text-center">
-                                    <button onClick={() => handleViewDetails({...record.employeeId, records: [record]})} className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50">
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                   </td>
-                                </tr>
-                              ))
-                            )}
+                            ) : paginatedRecords.map((rec, i) => (
+                              <tr key={rec._id || i} className="hover:bg-gray-50 transition">
+                                <td className="px-4 py-3">
+                                  <p className="font-medium text-gray-800">{rec.employeeId?.name || "—"}</p>
+                                  <p className="text-xs text-gray-400">{rec.employeeId?.email || ""}</p>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="text-xs bg-gray-100 px-2 py-1 rounded">{getDeptName(rec.employeeId?.department)}</span>
+                                  <p className="text-xs text-gray-500 mt-1">{rec.employeeId?.position || ""}</p>
+                                </td>
+                                <td className="px-4 py-3 font-mono text-sm">{fmtTime(rec.clockIn)}</td>
+                                <td className="px-4 py-3 font-mono text-sm">{fmtTime(rec.clockOut)}</td>
+                                <td className="px-4 py-3">{rec.hoursWorked ? `${rec.hoursWorked.toFixed(1)}h` : "--"}</td>
+                                <td className="px-4 py-3"><StatusBadge status={rec.status} /></td>
+                                <td className="px-4 py-3 text-center">
+                                  <button
+                                    onClick={() => { setSelectedEmployee({ ...rec.employeeId, records: [rec] }); setShowDetailModal(true); }}
+                                    className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
-                      {!loading && totalPages > 1 && (
-                        <div className="flex justify-between items-center px-4 py-3 border-t">
-                          <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="p-2 rounded disabled:opacity-40"><ChevronLeft className="w-5 h-5" /></button>
-                          <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages} className="p-2 rounded disabled:opacity-40"><ChevronRight className="w-5 h-5" /></button>
+                      {totalPages > 1 && (
+                        <div className="flex justify-between items-center px-4 py-3 border-t text-sm">
+                          <button onClick={() => setCurrentPage((p) => Math.max(1, p-1))} disabled={currentPage === 1} className="p-2 rounded disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+                          <span className="text-gray-600">Page {currentPage} of {totalPages}</span>
+                          <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p+1))} disabled={currentPage === totalPages} className="p-2 rounded disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {dateFilter === "month" && (
+                  ) : (
+                    /* Month View */
                     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className="bg-gray-50 border-b">
-                            <tr><th className="px-4 py-3 text-left">Employee</th><th className="px-4 py-3 text-left">Dept</th><th className="px-4 py-3 text-left">Position</th><th className="px-4 py-3 text-center">Present</th><th className="px-4 py-3 text-center">Absent</th><th className="px-4 py-3 text-center">Late</th><th className="px-4 py-3 text-center">Total Hours</th><th className="px-4 py-3 text-center">Attendance %</th><th className="px-4 py-3 text-center">Actions</th></tr></thead>
-                          <tbody>
-                            {loading ? <tr><td colSpan={9} className="text-center py-6"><RefreshCw className="w-4 h-4 animate-spin mx-auto" /></td></tr> :
-                              uniqueEmployeesForMonth.map(emp => (
-                                <tr key={emp._id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3"><p className="font-medium">{emp.name}</p><p className="text-xs text-gray-400">{emp.email}</p></td>
-                                  <td className="px-4 py-3"><span className="text-xs bg-gray-100 px-2 py-1 rounded">{getDepartmentName(emp.department)}</span></td>
-                                  <td className="px-4 py-3 text-xs">{emp.position || "--"}</td>
-                                  <td className="px-4 py-3 text-center text-green-600 font-semibold">{emp.presentDays}</td>
-                                  <td className="px-4 py-3 text-center text-red-600 font-semibold">{emp.absentDays}</td>
-                                  <td className="px-4 py-3 text-center text-yellow-600 font-semibold">{emp.lateDays}</td>
-                                  <td className="px-4 py-3 text-center">{emp.totalHours.toFixed(1)}h</td>
-                                  <td className="px-4 py-3 text-center">
-                                    <span className={`font-semibold ${emp.attendancePercent >= 75 ? "text-green-600" : emp.attendancePercent >= 50 ? "text-yellow-600" : "text-red-600"}`}>{emp.attendancePercent}%</span>
-                                    <div className="w-16 bg-gray-200 rounded-full h-1.5 mt-1 mx-auto"><div className={`h-1.5 rounded-full ${emp.attendancePercent >= 75 ? "bg-green-500" : emp.attendancePercent >= 50 ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${emp.attendancePercent}%` }} /></div>
-                                  </td>
-                                  <td className="px-4 py-3 text-center"><button onClick={() => handleViewDetails(emp)} className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50"><Eye className="w-4 h-4" /></button></td>
-                                </tr>
+                            <tr>
+                              {["Employee","Dept","Position","Present","Absent","Late","Total Hrs","Attendance %","Actions"].map((h) => (
+                                <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                               ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {employeeSummaries.length === 0 ? (
+                              <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">No records for this month</td></tr>
+                            ) : employeeSummaries.map((emp) => (
+                              <tr key={emp._id} className="hover:bg-gray-50 transition">
+                                <td className="px-4 py-3">
+                                  <p className="font-medium text-gray-800">{emp.name}</p>
+                                  <p className="text-xs text-gray-400">{emp.email}</p>
+                                </td>
+                                <td className="px-4 py-3"><span className="text-xs bg-gray-100 px-2 py-1 rounded">{getDeptName(emp.department)}</span></td>
+                                <td className="px-4 py-3 text-xs text-gray-600">{emp.position || "--"}</td>
+                                <td className="px-4 py-3 text-center font-semibold text-green-600">{emp.present}</td>
+                                <td className="px-4 py-3 text-center font-semibold text-red-600">{emp.absent}</td>
+                                <td className="px-4 py-3 text-center font-semibold text-yellow-600">{emp.late}</td>
+                                <td className="px-4 py-3 text-center">{emp.totalHrs.toFixed(1)}h</td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`font-semibold text-sm ${emp.pct >= 75 ? "text-green-600" : emp.pct >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                                    {emp.pct}%
+                                  </span>
+                                  <div className="w-16 bg-gray-200 rounded-full h-1.5 mt-1 mx-auto">
+                                    <div className={`h-1.5 rounded-full ${emp.pct >= 75 ? "bg-green-500" : emp.pct >= 50 ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${emp.pct}%` }} />
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button
+                                    onClick={() => { setSelectedEmployee(emp); setShowDetailModal(true); }}
+                                    className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
@@ -847,152 +747,280 @@ const AdminAttendanceMonitor = () => {
                   )}
                 </div>
 
-                {/* Leave Requests Section */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                  <div className="p-4 border-b bg-gray-50">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-gray-800 flex items-center gap-2"><Users className="w-5 h-5 text-indigo-600" /> Leave Requests</h3>
-                      <button onClick={fetchLeaveRequests} className="p-1 text-gray-400 hover:text-gray-600"><RefreshCw className="w-4 h-4" /></button>
+                {/* ── Leave Requests Panel ──────────────────────────────────── */}
+                {loadingLeaves ? <SkeletonLeavePanel /> : (
+                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                    <div className="p-4 border-b bg-gray-50">
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                          <Users className="w-5 h-5 text-indigo-600" /> Leave Requests
+                        </h3>
+                        <button onClick={() => fetchLeaves(true)} className="p-1 text-gray-400 hover:text-gray-600">
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1 text-center p-2 bg-yellow-50 rounded-lg">
+                          <p className="text-xs text-yellow-600">Pending</p>
+                          <p className="text-lg font-bold text-yellow-700">{pendingCount}</p>
+                        </div>
+                        <div className="flex-1 text-center p-2 bg-green-50 rounded-lg">
+                          <p className="text-xs text-green-600">Approved</p>
+                          <p className="text-lg font-bold text-green-700">{approvedCount}</p>
+                        </div>
+                        <div className="flex-1 text-center p-2 bg-red-50 rounded-lg">
+                          <p className="text-xs text-red-600">Rejected</p>
+                          <p className="text-lg font-bold text-red-700">{rejectedCount}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      <div className="flex-1 text-center p-1.5 bg-yellow-50 rounded-lg"><p className="text-xs text-yellow-600">Pending</p><p className="text-lg font-bold text-yellow-700">{pendingCount}</p></div>
-                      <div className="flex-1 text-center p-1.5 bg-green-50 rounded-lg"><p className="text-xs text-green-600">Approved</p><p className="text-lg font-bold text-green-700">{approvedCount}</p></div>
-                      <div className="flex-1 text-center p-1.5 bg-red-50 rounded-lg"><p className="text-xs text-red-600">Rejected</p><p className="text-lg font-bold text-red-700">{rejectedCount}</p></div>
-                    </div>
-                  </div>
-                  <div className="p-3 border-b">
-                    <div className="flex gap-1">
-                      {["all", "pending", "approved", "rejected"].map(f => (
-                        <button key={f} onClick={() => setLeaveFilter(f)} className={`flex-1 px-2 py-1 text-xs font-medium rounded-md capitalize ${leaveFilter === f ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}>{f}</button>
+
+                    <div className="p-3 border-b flex gap-1">
+                      {["all","pending","approved","rejected"].map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setLeaveFilter(f)}
+                          className={`flex-1 px-2 py-1 text-xs font-medium rounded-md capitalize ${
+                            leaveFilter === f ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"
+                          }`}
+                        >
+                          {f}
+                        </button>
                       ))}
                     </div>
-                  </div>
-                  <div className="divide-y max-h-[500px] overflow-y-auto">
-                    {leaveLoading ? <div className="p-8 text-center"><RefreshCw className="w-6 h-6 animate-spin mx-auto" /></div> :
-                      filteredLeaves.length === 0 ? <div className="p-8 text-center text-gray-400">No leave requests</div> :
-                      filteredLeaves.map(leave => (
+
+                    <div className="divide-y max-h-[520px] overflow-y-auto">
+                      {filteredLeaves.length === 0 ? (
+                        <p className="p-8 text-center text-gray-400 text-sm">No leave requests</p>
+                      ) : filteredLeaves.map((leave) => (
                         <div key={leave._id} className="p-4 hover:bg-gray-50">
                           <div className="flex justify-between items-start mb-2">
-                            <div><p className="font-medium">{leave.employeeId?.name || "Unknown"}</p><p className="text-xs text-gray-500">{leave.employeeId?.department || "-"}</p></div>
-                            {getLeaveStatusBadge(leave.status)}
+                            <div>
+                              <p className="font-medium text-gray-800 text-sm">{leave.employeeId?.name || "Unknown"}</p>
+                              <p className="text-xs text-gray-400">{leave.employeeId?.department || "-"}</p>
+                            </div>
+                            <StatusBadge status={leave.status} />
                           </div>
-                          <div className="text-xs text-gray-600 space-y-1">
-                            <p>📅 {format(parseISO(leave.startDate), "dd MMM")} - {format(parseISO(leave.endDate), "dd MMM yyyy")}</p>
-                            <p>📝 {leave.reason || "No reason"}</p>
+                          <div className="text-xs text-gray-600 space-y-0.5">
+                            <p>📅 {format(parseISO(leave.startDate), "dd MMM")} – {format(parseISO(leave.endDate), "dd MMM yyyy")}</p>
+                            <p>📝 {leave.reason || "No reason provided"}</p>
                             <p>⏱️ {leave.days || 1} day(s)</p>
                           </div>
                           {leave.status === "pending" && (
                             <div className="flex gap-2 mt-3">
-                              <button onClick={() => approveLeave(leave._id)} className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs flex items-center justify-center gap-1"><CheckCircle className="w-3 h-3" /> Approve</button>
-                              <button onClick={() => rejectLeave(leave._id)} className="flex-1 px-2 py-1 bg-red-500 text-white rounded text-xs flex items-center justify-center gap-1"><XCircle className="w-3 h-3" /> Reject</button>
+                              <button
+                                onClick={() => updateLeaveStatus(leave._id, "approved")}
+                                className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs flex items-center justify-center gap-1"
+                              >
+                                <CheckCircle className="w-3 h-3" /> Approve
+                              </button>
+                              <button
+                                onClick={() => updateLeaveStatus(leave._id, "rejected")}
+                                className="flex-1 px-2 py-1 bg-red-500 text-white rounded text-xs flex items-center justify-center gap-1"
+                              >
+                                <XCircle className="w-3 h-3" /> Reject
+                              </button>
                             </div>
                           )}
                         </div>
                       ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </>
           )}
 
-          {/* ==================== HOLIDAY CALENDAR TAB CONTENT (DATABASE STORED) ==================== */}
+          {/* ════════════════ HOLIDAY TAB ═══════════════════════════════════════ */}
           {activeTab === "holidays" && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-              {/* Calendar Header */}
-              <div className="p-4 border-b bg-gray-50">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    <button onClick={goToPreviousHolidayMonth} className="p-2 hover:bg-gray-200 rounded-lg"><ChevronLeft className="w-5 h-5" /></button>
-                    <h2 className="text-xl font-semibold text-gray-800">{format(holidayMonth, "MMMM yyyy")}</h2>
-                    <button onClick={goToNextHolidayMonth} className="p-2 hover:bg-gray-200 rounded-lg"><ChevronRight className="w-5 h-5" /></button>
+            loadingHolidays ? <SkeletonHolidayCalendar /> : (
+              <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                {/* Calendar header */}
+                <div className="p-4 border-b bg-gray-50">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                      <button onClick={() => setHolidayMonth((m) => subMonths(m, 1))} className="p-2 hover:bg-gray-200 rounded-lg">
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <h2 className="text-xl font-semibold text-gray-800">{format(holidayMonth, "MMMM yyyy")}</h2>
+                      <button onClick={() => setHolidayMonth((m) => addMonths(m, 1))} className="p-2 hover:bg-gray-200 rounded-lg">
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <button onClick={() => setHolidayMonth(new Date())} className="px-3 py-1 text-sm bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200">
+                      Today
+                    </button>
                   </div>
-                  <button onClick={goToTodayHoliday} className="px-3 py-1 text-sm bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200">Today</button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">✅ Holidays are stored in database and visible to all employees</p>
-              </div>
 
-              {/* Calendar Body */}
-              <div className="p-4">
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {weekDays.map((day, idx) => (
-                    <div key={idx} className={`text-center text-sm font-semibold py-2 ${idx === 0 || idx === 6 ? "text-red-500" : "text-gray-600"}`}>{day}</div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: holidayLeadingBlanks }).map((_, i) => <div key={`blank-${i}`} className="min-h-[100px] bg-gray-50 rounded-lg" />)}
-                  {holidayDays.map((day, idx) => {
-                    const holiday = getHolidayForDate(day);
-                    const isWeekendDay = isWeekend(day);
-                    const isCurrentDay = isToday(day);
-                    const holidayType = holiday ? holidayTypes[holiday.type] : null;
-                    return (
-                      <div key={idx} className={`min-h-[100px] p-2 rounded-lg border transition-all cursor-pointer ${isCurrentDay ? "ring-2 ring-indigo-500" : ""} ${holiday ? holidayType.bg : isWeekendDay ? "bg-purple-50" : "bg-white"} ${holiday ? `border-l-4 ${holidayType.border}` : "border border-gray-100"} hover:shadow-md`} onClick={() => { if (holiday) { setSelectedHoliday(holiday); setShowEditHolidayModal(true); } }}>
-                        <div className="flex justify-between items-start">
-                          <span className={`text-sm font-semibold inline-flex items-center justify-center w-7 h-7 rounded-full ${isCurrentDay ? "bg-indigo-600 text-white" : "text-gray-700"} ${isWeekendDay && !holiday ? "text-purple-600" : ""}`}>{format(day, "d")}</span>
-                          {holiday && <div className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">Holiday</div>}
-                          {!holiday && isWeekendDay && <div className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600">Weekend</div>}
+                {/* Calendar grid */}
+                <div className="p-4">
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {WEEK_DAYS.map((d, i) => (
+                      <div key={i} className={`text-center text-sm font-semibold py-2 ${i === 0 || i === 6 ? "text-red-500" : "text-gray-600"}`}>{d}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: calBlanks }).map((_, i) => (
+                      <div key={`b-${i}`} className="min-h-[100px] bg-gray-50 rounded-lg" />
+                    ))}
+                    {calDays.map((day, idx) => {
+                      const holiday     = getHolidayForDate(day);
+                      const weekend     = isWeekend(day);
+                      const isTodays    = isToday(day);
+                      const hType       = holiday ? HOLIDAY_TYPES[holiday.type] : null;
+
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => holiday && (setSelectedHoliday(holiday), setShowEditModal(true))}
+                          className={`min-h-[100px] p-2 rounded-lg border transition-all ${holiday ? "cursor-pointer" : ""} ${
+                            isTodays ? "ring-2 ring-indigo-500" : ""
+                          } ${
+                            holiday ? `${hType.bg} border-l-4 ${hType.border}` : weekend ? "bg-purple-50 border-gray-100" : "bg-white border-gray-100"
+                          } hover:shadow-md`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className={`text-sm font-semibold inline-flex items-center justify-center w-7 h-7 rounded-full ${
+                              isTodays ? "bg-indigo-600 text-white" : weekend && !holiday ? "text-purple-600" : "text-gray-700"
+                            }`}>
+                              {format(day, "d")}
+                            </span>
+                            {holiday && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">Holiday</span>}
+                            {!holiday && weekend && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600">Weekend</span>}
+                          </div>
+                          {holiday && (
+                            <div className="mt-1">
+                              <p className="text-xs font-semibold text-gray-800 leading-tight">{holiday.name}</p>
+                              {holiday.description && <p className="text-[10px] text-gray-500 truncate">{holiday.description}</p>}
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full mt-1 inline-block ${hType?.color}`}>{hType?.name}</span>
+                            </div>
+                          )}
+                          {!holiday && weekend && (
+                            <div className="mt-1">
+                              <p className="text-xs text-purple-600 font-medium">Weekend</p>
+                              <p className="text-[10px] text-gray-400">No work</p>
+                            </div>
+                          )}
                         </div>
-                        {holiday && (<div className="mt-1"><p className="text-xs font-semibold text-gray-800">{holiday.name}</p><p className="text-xs text-gray-500 truncate">{holiday.description}</p><div className="mt-1"><span className={`text-xs px-1.5 py-0.5 rounded-full ${holidayType?.color}`}>{holidayType?.name}</span></div></div>)}
-                        {!holiday && isWeekendDay && (<div className="mt-1"><p className="text-xs text-purple-600 font-medium">Weekend</p><p className="text-xs text-gray-400">No work</p></div>)}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-4 pt-3 border-t flex flex-wrap gap-3">
+                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-purple-100 border border-purple-200 rounded" /><span className="text-xs text-gray-600">Weekend</span></div>
+                    {Object.entries(HOLIDAY_TYPES).map(([key, val]) => (
+                      <div key={key} className="flex items-center gap-1.5"><div className={`w-3 h-3 ${val.bg} border ${val.border} rounded`} /><span className="text-xs text-gray-600">{val.name}</span></div>
+                    ))}
+                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-indigo-500 rounded-full" /><span className="text-xs text-gray-600">Today</span></div>
+                  </div>
                 </div>
-                <div className="mt-4 pt-3 border-t">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Legend (Database Stored):</p>
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-purple-100 border border-purple-200 rounded"></div><span className="text-xs text-gray-600">Weekend</span></div>
-                    {Object.entries(holidayTypes).map(([key, value]) => (<div key={key} className="flex items-center gap-1.5"><div className={`w-3 h-3 ${value.bg} border ${value.border} rounded`}></div><span className="text-xs text-gray-600">{value.name}</span></div>))}
-                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-indigo-500 rounded-full"></div><span className="text-xs text-gray-600">Today</span></div>
-                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-red-100 border border-red-200 rounded"></div><span className="text-xs text-gray-600">Click to Edit</span></div>
+
+                {/* Holiday list table */}
+                <div className="border-t">
+                  <div className="p-4 bg-gray-50 flex justify-between items-center">
+                    <h3 className="font-semibold text-gray-800">All Holidays ({holidays.length})</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          {["Holiday Name","Date","Day","Type","Description","Actions"].map((h) => (
+                            <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {holidays.length === 0 ? (
+                          <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">No holidays. Click "Add Holiday" to create one.</td></tr>
+                        ) : [...holidays].sort((a, b) => new Date(a.date) - new Date(b.date)).map((h) => {
+                          const HIcon = HOLIDAY_TYPES[h.type]?.icon || Calendar;
+                          return (
+                            <tr key={h._id} className="hover:bg-gray-50 transition">
+                              <td className="px-4 py-3 font-medium">{h.name}</td>
+                              <td className="px-4 py-3 whitespace-nowrap">{format(parseISO(h.date), "dd MMM yyyy")}</td>
+                              <td className="px-4 py-3">{format(parseISO(h.date), "EEEE")}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${HOLIDAY_TYPES[h.type]?.color || "bg-gray-100"}`}>
+                                  <HIcon className="w-3 h-3" />
+                                  {HOLIDAY_TYPES[h.type]?.name || h.type}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{h.description || "-"}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-1">
+                                  <button onClick={() => { setSelectedHoliday(h); setShowEditModal(true); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit className="w-4 h-4" /></button>
+                                  <button onClick={() => { setSelectedHoliday(h); setShowDeleteModal(true); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
-
-              {/* Holiday List Table */}
-              <div className="border-t">
-                <div className="p-4 bg-gray-50"><h3 className="font-semibold text-gray-800">All Holidays from Database ({holidays.length})</h3></div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left">Holiday Name</th><th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Day</th><th className="px-4 py-3 text-left">Type</th><th className="px-4 py-3 text-left">Description</th><th className="px-4 py-3 text-center">Actions</th></tr></thead>
-                    <tbody className="divide-y">
-                      {holidayLoading ? <tr><td colSpan={6} className="text-center py-6"><RefreshCw className="w-5 h-5 animate-spin mx-auto" /> Loading from database...</td></tr> :
-                        holidays.length === 0 ? <tr><td colSpan={6} className="text-center py-6 text-gray-400">No holidays in database. Click "Add Holiday" to create.</td></tr> :
-                        [...holidays].sort((a,b)=>new Date(a.date)-new Date(b.date)).map(holiday => {
-                          const HolidayIcon = holidayTypes[holiday.type]?.icon || Calendar;
-                          return (<tr key={holiday._id} className="hover:bg-gray-50"><td className="px-4 py-3 font-medium">{holiday.name}</td><td className="px-4 py-3">{format(parseISO(holiday.date), "dd MMM yyyy")}</td><td className="px-4 py-3">{format(parseISO(holiday.date), "EEEE")}</td><td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${holidayTypes[holiday.type]?.color || "bg-gray-100"}`}><HolidayIcon className="w-3 h-3 inline mr-1" />{holidayTypes[holiday.type]?.name || holiday.type}</span></td><td className="px-4 py-3 text-gray-500 text-xs">{holiday.description || "-"}</td><td className="px-4 py-3 text-center"><div className="flex gap-1 justify-center"><button onClick={() => { setSelectedHoliday(holiday); setShowEditHolidayModal(true); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit className="w-4 h-4" /></button><button onClick={() => { setSelectedHoliday(holiday); setShowDeleteHolidayModal(true); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button></div></td></tr>);
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            )
           )}
-          
-          <div className="text-xs text-gray-400 text-center mt-6">
-            📊 Last sync: {new Date().toLocaleTimeString()} | {activeTab === "attendance" ? (dateFilter === "today" ? "Today's attendance" : `Month: ${format(selectedMonth, "MMMM yyyy")}`) : "Holiday Calendar (Data stored in Database)"}
-          </div>
+
+          {/* Footer */}
+          <p className="text-xs text-gray-400 text-center mt-6">
+            Last sync: {new Date().toLocaleTimeString()} ·{" "}
+            {activeTab === "attendance"
+              ? dateFilter === "today" ? "Today's attendance" : `Month: ${format(selectedMonth, "MMMM yyyy")}`
+              : "Holiday Calendar"}
+          </p>
         </div>
       </div>
 
-      {/* Detail Modal */}
-      {showDetailModal && selectedEmployeeDetails && (
+      {/* ════════ Detail Modal ════════════════════════════════════════════════ */}
+      {showDetailModal && selectedEmployee && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center sticky top-0">
-              <div><h3 className="text-white font-semibold text-lg">Attendance Details</h3><p className="text-indigo-200 text-sm">{selectedEmployeeDetails.name} - {dateFilter === "month" ? format(selectedMonth, "MMMM yyyy") : format(new Date(), "dd MMM yyyy")}</p></div>
-              <button onClick={() => setShowDetailModal(null)} className="text-white hover:text-indigo-200"><X className="w-6 h-6" /></button>
+            <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-white font-semibold text-lg">Attendance Details</h3>
+                <p className="text-indigo-200 text-sm">
+                  {selectedEmployee.name} · {dateFilter === "month" ? format(selectedMonth, "MMMM yyyy") : format(new Date(), "dd MMM yyyy")}
+                </p>
+              </div>
+              <button onClick={() => setShowDetailModal(false)} className="text-white/80 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-green-50 rounded-lg p-3 text-center"><p className="text-xs text-green-600">Present</p><p className="text-2xl font-bold text-green-700">{selectedEmployeeDetails.records?.filter(r => r.status === "Present").length || (selectedEmployeeDetails.status === "Present" ? 1 : 0)}</p></div>
-                <div className="bg-red-50 rounded-lg p-3 text-center"><p className="text-xs text-red-600">Absent</p><p className="text-2xl font-bold text-red-700">{selectedEmployeeDetails.records?.filter(r => r.status === "Absent").length || (selectedEmployeeDetails.status === "Absent" ? 1 : 0)}</p></div>
-                <div className="bg-yellow-50 rounded-lg p-3 text-center"><p className="text-xs text-yellow-600">Late</p><p className="text-2xl font-bold text-yellow-700">{selectedEmployeeDetails.records?.filter(r => r.status === "Late").length || (selectedEmployeeDetails.status === "Late" ? 1 : 0)}</p></div>
-                <div className="bg-purple-50 rounded-lg p-3 text-center"><p className="text-xs text-purple-600">Total Hours</p><p className="text-2xl font-bold text-purple-700">{(selectedEmployeeDetails.records?.reduce((sum, r) => sum + (r.hoursWorked || 0), 0) || selectedEmployeeDetails.hoursWorked || 0).toFixed(1)}h</p></div>
+                {[
+                  { label: "Present", val: selectedEmployee.records?.filter((r) => r.status === "Present").length ?? 0, bg: "bg-green-50", text: "text-green-700" },
+                  { label: "Absent",  val: selectedEmployee.records?.filter((r) => r.status === "Absent").length  ?? 0, bg: "bg-red-50",   text: "text-red-700" },
+                  { label: "Late",    val: selectedEmployee.records?.filter((r) => r.status === "Late").length    ?? 0, bg: "bg-yellow-50", text: "text-yellow-700" },
+                  { label: "Total Hrs", val: `${(selectedEmployee.records?.reduce((s, r) => s + (r.hoursWorked || 0), 0) || selectedEmployee.hoursWorked || 0).toFixed(1)}h`, bg: "bg-purple-50", text: "text-purple-700" },
+                ].map(({ label, val, bg, text }) => (
+                  <div key={label} className={`${bg} rounded-lg p-3 text-center`}>
+                    <p className={`text-xs ${text} mb-1`}>{label}</p>
+                    <p className={`text-2xl font-bold ${text}`}>{val}</p>
+                  </div>
+                ))}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="px-4 py-2 text-left">Date</th><th className="px-4 py-2 text-left">Day</th><th className="px-4 py-2 text-left">Clock In</th><th className="px-4 py-2 text-left">Clock Out</th><th className="px-4 py-2 text-left">Hours</th><th className="px-4 py-2 text-left">Status</th></tr></thead>
-                <tbody className="divide-y">{selectedEmployeeDetails.records ? selectedEmployeeDetails.records.sort((a,b)=>new Date(a.date)-new Date(b.date)).map((record, idx) => (<tr key={idx} className="hover:bg-gray-50"><td className="px-4 py-2">{format(parseISO(record.date), "dd MMM yyyy")}</td><td className="px-4 py-2">{format(parseISO(record.date), "EEEE")}</td><td className="px-4 py-2 font-mono">{formatTime(record.clockIn)}</td><td className="px-4 py-2 font-mono">{formatTime(record.clockOut)}</td><td className="px-4 py-2">{record.hoursWorked ? `${record.hoursWorked.toFixed(1)} hrs` : "--"}</td><td className="px-4 py-2">{getStatusBadge(record.status)}</td></tr>)) : <tr><td colSpan={6} className="text-center py-2">{format(new Date(), "dd MMM yyyy")}</td><td>{format(new Date(), "EEEE")}</td><td>{formatTime(selectedEmployeeDetails.clockIn)}</td><td>{formatTime(selectedEmployeeDetails.clockOut)}</td><td>{selectedEmployeeDetails.hoursWorked ? `${selectedEmployeeDetails.hoursWorked.toFixed(1)} hrs` : "--"}</td><td>{getStatusBadge(selectedEmployeeDetails.status)}</td></tr>}</tbody>
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>{["Date","Day","Clock In","Clock Out","Hours","Status"].map((h) => (<th key={h} className="px-4 py-2 text-left font-medium text-gray-600">{h}</th>))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {(selectedEmployee.records || [selectedEmployee])
+                      .sort((a, b) => new Date(a.date) - new Date(b.date))
+                      .map((rec, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 whitespace-nowrap">{format(parseISO(rec.date), "dd MMM yyyy")}</td>
+                          <td className="px-4 py-2">{format(parseISO(rec.date), "EEEE")}</td>
+                          <td className="px-4 py-2 font-mono">{fmtTime(rec.clockIn)}</td>
+                          <td className="px-4 py-2 font-mono">{fmtTime(rec.clockOut)}</td>
+                          <td className="px-4 py-2">{rec.hoursWorked ? `${rec.hoursWorked.toFixed(1)}h` : "--"}</td>
+                          <td className="px-4 py-2"><StatusBadge status={rec.status} /></td>
+                        </tr>
+                      ))}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -1000,76 +1028,58 @@ const AdminAttendanceMonitor = () => {
         </div>
       )}
 
-      {/* Add Holiday Modal */}
-      {showAddHolidayModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-white font-semibold text-lg">Add New Holiday (Save to DB)</h3>
-              <button onClick={() => setShowAddHolidayModal(false)} className="text-white hover:text-indigo-200"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Holiday Name *</label><input type="text" value={newHoliday.name} onChange={(e) => setNewHoliday({...newHoliday, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., Diwali" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Date *</label><input type="date" value={newHoliday.date} onChange={(e) => setNewHoliday({...newHoliday, date: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Holiday Type</label><select value={newHoliday.type} onChange={(e) => setNewHoliday({...newHoliday, type: e.target.value})} className="w-full px-3 py-2 border rounded-lg"><option value="public">Public Holiday</option><option value="religious">Religious</option><option value="festival">Festival</option><option value="company">Company Event</option><option value="optional">Optional Holiday</option></select></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={newHoliday.description} onChange={(e) => setNewHoliday({...newHoliday, description: e.target.value})} className="w-full px-3 py-2 border rounded-lg" rows="2" placeholder="Additional details" /></div>
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-2xl">
-              <button onClick={() => setShowAddHolidayModal(false)} className="px-4 py-2 bg-gray-200 rounded-lg">Cancel</button>
-              <button onClick={addHoliday} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">Save to Database</button>
-            </div>
-          </div>
-        </div>
+      {/* ════════ Add Holiday Modal ═══════════════════════════════════════════ */}
+      {showAddModal && (
+        <HolidayModal title="Add New Holiday" color="bg-indigo-600" onClose={() => setShowAddModal(false)} onConfirm={addHoliday} confirmLabel="Save Holiday">
+          <Field label="Holiday Name *">
+            <input type="text" value={newHoliday.name} onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })} className={inputCls} placeholder="e.g. Diwali" />
+          </Field>
+          <Field label="Date *">
+            <input type="date" value={newHoliday.date} onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Type">
+            <select value={newHoliday.type} onChange={(e) => setNewHoliday({ ...newHoliday, type: e.target.value })} className={inputCls}>
+              {Object.entries(HOLIDAY_TYPES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Description">
+            <textarea value={newHoliday.description} onChange={(e) => setNewHoliday({ ...newHoliday, description: e.target.value })} className={inputCls} rows={2} placeholder="Optional details" />
+          </Field>
+        </HolidayModal>
       )}
 
-      {/* Edit Holiday Modal */}
-      {showEditHolidayModal && selectedHoliday && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="bg-blue-600 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-white font-semibold text-lg">Edit Holiday</h3>
-              <button onClick={() => { setShowEditHolidayModal(false); setSelectedHoliday(null); }} className="text-white hover:text-blue-200"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Holiday Name</label><input type="text" value={selectedHoliday.name} onChange={(e) => setSelectedHoliday({...selectedHoliday, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" value={selectedHoliday.date} onChange={(e) => setSelectedHoliday({...selectedHoliday, date: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Type</label><select value={selectedHoliday.type} onChange={(e) => setSelectedHoliday({...selectedHoliday, type: e.target.value})} className="w-full px-3 py-2 border rounded-lg"><option value="public">Public Holiday</option><option value="religious">Religious</option><option value="festival">Festival</option><option value="company">Company Event</option><option value="optional">Optional Holiday</option></select></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={selectedHoliday.description} onChange={(e) => setSelectedHoliday({...selectedHoliday, description: e.target.value})} className="w-full px-3 py-2 border rounded-lg" rows="2" /></div>
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-2xl">
-              <button onClick={() => { setShowEditHolidayModal(false); setSelectedHoliday(null); }} className="px-4 py-2 bg-gray-200 rounded-lg">Cancel</button>
-              <button onClick={updateHoliday} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Update in Database</button>
-            </div>
-          </div>
-        </div>
+      {/* ════════ Edit Holiday Modal ══════════════════════════════════════════ */}
+      {showEditModal && selectedHoliday && (
+        <HolidayModal title="Edit Holiday" color="bg-blue-600" onClose={() => { setShowEditModal(false); setSelectedHoliday(null); }} onConfirm={updateHoliday} confirmLabel="Update Holiday">
+          <Field label="Holiday Name">
+            <input type="text" value={selectedHoliday.name} onChange={(e) => setSelectedHoliday({ ...selectedHoliday, name: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Date">
+            <input type="date" value={selectedHoliday.date} onChange={(e) => setSelectedHoliday({ ...selectedHoliday, date: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Type">
+            <select value={selectedHoliday.type} onChange={(e) => setSelectedHoliday({ ...selectedHoliday, type: e.target.value })} className={inputCls}>
+              {Object.entries(HOLIDAY_TYPES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Description">
+            <textarea value={selectedHoliday.description} onChange={(e) => setSelectedHoliday({ ...selectedHoliday, description: e.target.value })} className={inputCls} rows={2} />
+          </Field>
+        </HolidayModal>
       )}
 
-      {/* Delete Holiday Modal */}
-      {showDeleteHolidayModal && selectedHoliday && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="bg-red-600 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-white font-semibold text-lg">Delete Holiday from Database</h3>
-              <button onClick={() => { setShowDeleteHolidayModal(false); setSelectedHoliday(null); }} className="text-white hover:text-red-200"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-6">
-              <p className="text-gray-700 mb-2">Are you sure you want to delete this holiday from database?</p>
-              <div className="bg-gray-50 p-3 rounded-lg"><p className="font-medium">{selectedHoliday.name}</p><p className="text-sm text-gray-500">{format(parseISO(selectedHoliday.date), "dd MMM yyyy")}</p></div>
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-2xl">
-              <button onClick={() => { setShowDeleteHolidayModal(false); setSelectedHoliday(null); }} className="px-4 py-2 bg-gray-200 rounded-lg">Cancel</button>
-              <button onClick={deleteHoliday} className="px-4 py-2 bg-red-600 text-white rounded-lg">Delete from Database</button>
-            </div>
+      {/* ════════ Delete Holiday Modal ════════════════════════════════════════ */}
+      {showDeleteModal && selectedHoliday && (
+        <HolidayModal title="Delete Holiday" color="bg-red-600" onClose={() => { setShowDeleteModal(false); setSelectedHoliday(null); }} onConfirm={deleteHoliday} confirmLabel="Delete">
+          <p className="text-gray-700">Are you sure you want to delete this holiday?</p>
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <p className="font-medium">{selectedHoliday.name}</p>
+            <p className="text-sm text-gray-500">{format(parseISO(selectedHoliday.date), "dd MMM yyyy")}</p>
           </div>
-        </div>
+        </HolidayModal>
       )}
     </>
   );
-};
-
-const StatCard = ({ icon: Icon, label, value, color }) => {
-  const colorMap = { blue: "bg-blue-100 text-blue-600", orange: "bg-orange-100 text-orange-600", green: "bg-green-100 text-green-600", red: "bg-red-100 text-red-600", purple: "bg-purple-100 text-purple-600" };
-  return (<div className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between border border-gray-100"><div><p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p><p className="text-2xl font-bold text-gray-800 mt-1">{value}</p></div><div className={`p-2 rounded-full ${colorMap[color]}`}><Icon className="w-5 h-5" /></div></div>);
 };
 
 export default AdminAttendanceMonitor;
