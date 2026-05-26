@@ -20,6 +20,8 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dayjs": "^1.11.19",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.552.0",
     "npx": "^10.2.2",
     "qrcode.react": "^4.2.0",

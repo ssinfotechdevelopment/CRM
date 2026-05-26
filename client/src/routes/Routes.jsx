@@ -6,8 +6,9 @@ import StudentForm from "../pages/StudentForm";
 import DashboardAdmin from "../admin/components/DashboardAdmin";
 import DashboardEmployee from "../employee/components/DashboardEmployee";
 import AdminAttendanceMonitor from "../admin/pages/AdminAttendanceMonitor";
-import SalaryManagement from "../admin/pages/SalaryManagement"; // 👈 ADD THIS IMPORT
-
+import SalaryManagement from "../admin/pages/SalaryManagement";
+import AdminEmployeeSalaryDetails from "../employee/pages/EmployeeSalaryDetails"; 
+import EmployeeSalaryDetails from "../employee/pages/EmployeeSalaryDetails";
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole }) => {
   // Check for appropriate token based on role
@@ -73,7 +74,7 @@ const AppRoutes = () => (
     
     <Route path="/student-form" element={<StudentForm />} />
     
-    {/* Admin routes */}
+    {/* Admin Login */}
     <Route 
       path="/admin" 
       element={
@@ -83,7 +84,7 @@ const AppRoutes = () => (
       } 
     />
     
-    {/* Employee routes */}
+    {/* Employee Login */}
     <Route 
       path="/employee/login" 
       element={
@@ -93,7 +94,9 @@ const AppRoutes = () => (
       } 
     />
     
-    {/* Protected admin routes */}
+    {/* ==================== PROTECTED ADMIN ROUTES ==================== */}
+    
+    {/* Admin Dashboard */}
     <Route 
       path="/admin/dashboard/*" 
       element={
@@ -113,7 +116,7 @@ const AppRoutes = () => (
       } 
     />
 
-    {/* 👇 NEW ROUTE - Salary Management */}
+    {/* Admin Salary Management */}
     <Route 
       path="/admin/salary-management" 
       element={
@@ -122,8 +125,20 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } 
     />
+
+    {/* Admin View Employee Salary Details (Admin can see any employee's salary) */}
+    <Route 
+      path="/admin/salary-details/:employeeId" 
+      element={
+        <ProtectedRoute requiredRole="admin">
+          <AdminEmployeeSalaryDetails />
+        </ProtectedRoute>
+      } 
+    />
     
-    {/* Protected employee routes */}
+    {/* ==================== PROTECTED EMPLOYEE ROUTES ==================== */}
+    
+    {/* Employee Dashboard (All employee routes are inside this) */}
     <Route 
       path="/employee/dashboard/*" 
       element={
@@ -133,6 +148,7 @@ const AppRoutes = () => (
       } 
     />
     
+    {/* Employee Task Route (Backward compatibility) */}
     <Route 
       path="/employee/task" 
       element={
@@ -142,8 +158,24 @@ const AppRoutes = () => (
       } 
     />
     
-    {/* Catch all route */}
-    <Route path="*" element={<Navigate to="/" replace />} />
+    {/* Employee Salary Details (Employee views their own salary) */}
+    {/* This route is actually handled inside DashboardEmployee, but kept for direct access */}
+    <Route 
+      path="/employee/salary-details" 
+      element={
+        <ProtectedRoute requiredRole="employee">
+          <EmployeeSalaryDetails />
+        </ProtectedRoute>
+      } 
+    />
+    
+    {/* Catch all route - redirect to appropriate dashboard based on role */}
+    <Route 
+      path="*" 
+      element={
+        <Navigate to="/employee/login" replace />
+      } 
+    />
   </Routes>
 );
 
