@@ -51,22 +51,32 @@ const EmployeeSalaryDetails = () => {
   const currentEmployee = JSON.parse(localStorage.getItem("employeeData") || "{}");
   const employeeId = currentEmployee._id;
 
-  // Use employee data from localStorage directly
-  useEffect(() => {
-    if (currentEmployee && currentEmployee.name) {
+  // Fetch employee details from backend
+  const fetchEmployee = async () => {
+    try {
+      const res = await fetch(`${API}/employee/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setEmployee(data.data);
+      } else if (data.success && data.employee) {
+        setEmployee(data.employee);
+      } else {
+        setEmployee(currentEmployee);
+      }
+    } catch (error) {
+      console.error("Error fetching employee:", error);
       setEmployee(currentEmployee);
-    } else {
-      toast.error("Please login again");
-      navigate("/employee/login");
     }
-    setLoading(false);
-  }, []);
+  };
 
-  // Fetch salary history
+  // Fetch salary history from backend
   const fetchSalaryHistory = async () => {
     if (!employeeId) return;
     
     try {
+      console.log("Fetching salary history for employee:", employeeId);
       const res = await fetch(`${API}/salaries/history/${employeeId}`, {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -74,62 +84,34 @@ const EmployeeSalaryDetails = () => {
         }
       });
       
-      if (res.status === 401) {
-        console.log("Unauthorized - using mock data");
-        // Use mock data for demo
-        const mockHistory = [
-          {
-            month: new Date().getMonth(),
-            year: new Date().getFullYear(),
-            monthName: new Date().toLocaleString('default', { month: 'long' }),
-            baseSalary: currentEmployee.salary || 0,
-            finalSalary: currentEmployee.salary || 0,
-            leaveDeduction: 0,
-            overtimePay: 0,
-            paidLeaves: 0,
-            unpaidLeaves: 0,
-            totalOvertimeHours: 0,
-            status: "Not Processed"
-          }
-        ];
-        setSalaryHistory(mockHistory);
-        calculateStats(mockHistory);
-        return;
-      }
-      
       const data = await res.json();
-      if (data.success) {
-        setSalaryHistory(data.history || []);
-        calculateStats(data.history || []);
+      console.log("Salary history response:", data);
+      
+      if (data.success && data.history) {
+        setSalaryHistory(data.history);
+        calculateStats(data.history);
+      } else if (data.success && data.data) {
+        const history = Array.isArray(data.data) ? data.data : [];
+        setSalaryHistory(history);
+        calculateStats(history);
+      } else {
+        console.log("No salary history found");
+        setSalaryHistory([]);
+        calculateStats([]);
       }
     } catch (error) {
       console.error("Error fetching salary history:", error);
-      // Set mock data on error
-      const mockHistory = [
-        {
-          month: new Date().getMonth(),
-          year: new Date().getFullYear(),
-          monthName: new Date().toLocaleString('default', { month: 'long' }),
-          baseSalary: currentEmployee.salary || 0,
-          finalSalary: currentEmployee.salary || 0,
-          leaveDeduction: 0,
-          overtimePay: 0,
-          paidLeaves: 0,
-          unpaidLeaves: 0,
-          totalOvertimeHours: 0,
-          status: "Not Processed"
-        }
-      ];
-      setSalaryHistory(mockHistory);
-      calculateStats(mockHistory);
+      setSalaryHistory([]);
+      calculateStats([]);
     }
   };
 
-  // Fetch current month salary breakdown
+  // Fetch current month salary breakdown from backend
   const fetchCurrentSalary = async () => {
     if (!employeeId) return;
     
     try {
+      console.log("Fetching salary breakdown for:", employeeId, selectedMonth, selectedYear);
       const res = await fetch(`${API}/salaries/calculate/${employeeId}?month=${selectedMonth}&year=${selectedYear}`, {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -137,23 +119,9 @@ const EmployeeSalaryDetails = () => {
         }
       });
       
-      if (res.status === 401) {
-        // Use calculated data from employee salary
-        const baseSalary = currentEmployee.salary || 0;
-        const dailyRate = baseSalary / 22;
-        const hourlyRate = dailyRate / 9;
-        
-        setCurrentSalary({
-          baseSalary: baseSalary,
-          finalSalary: baseSalary,
-          leaves: { total: 0, paid: 0, unpaid: 0, deduction: 0 },
-          overtime: { totalHours: 0, pay: 0 },
-          rates: { dailyRate: dailyRate, hourlyRate: hourlyRate, overtimeRate: hourlyRate * 1.5 }
-        });
-        return;
-      }
-      
       const data = await res.json();
+      console.log("Salary breakdown response:", data);
+      
       if (data.success && data.data) {
         setCurrentSalary(data.data);
       } else {
@@ -189,6 +157,18 @@ const EmployeeSalaryDetails = () => {
 
   // Calculate statistics from history
   const calculateStats = (history) => {
+    if (!history || history.length === 0) {
+      setStats({
+        totalEarned: 0,
+        totalDeductions: 0,
+        totalOvertime: 0,
+        averageSalary: 0,
+        bestMonth: null,
+        totalMonths: 0
+      });
+      return;
+    }
+    
     const totalEarned = history.reduce((sum, record) => sum + (record.finalSalary || record.amount || 0), 0);
     const totalDeductions = history.reduce((sum, record) => sum + (record.leaveDeduction || 0), 0);
     const totalOvertime = history.reduce((sum, record) => sum + (record.overtimePay || 0), 0);
@@ -289,9 +269,15 @@ const EmployeeSalaryDetails = () => {
   };
 
   useEffect(() => {
-    if (employeeId && token) {
-      fetchSalaryHistory();
+    if (!token) {
+      toast.error("Please login again");
+      navigate("/employee/login");
+      return;
     }
+    
+    fetchEmployee();
+    fetchSalaryHistory();
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -626,7 +612,7 @@ const EmployeeSalaryDetails = () => {
         </div>
       </div>
 
-      {/* Salary Slip Modal - Same as before */}
+      {/* Salary Slip Modal */}
       {showSalarySlip && currentSalary && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
