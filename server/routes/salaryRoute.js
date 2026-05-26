@@ -18,75 +18,84 @@ import {
 const router = express.Router();
 
 // ==================== ADMIN ONLY ROUTES ====================
-router.use(protect); // Admin authentication for all routes below
-
-// Process bulk payroll for all employees (Admin only)
-router.post('/process-bulk-payroll', processBulkPayroll);
-
-// Pay salary to employee (Admin only)
-router.post('/pay/:id', paySalary);
-
-// Get all salary records with filters (Admin only)
-router.get('/records', getAllSalaryRecords);
-
-// Get salary statistics (Admin only)
-router.get('/statistics', getSalaryStatistics);
-
-// Get pending salaries (Admin only)
-router.get('/pending', getPendingSalaries);
-
-// Update salary record (Admin only)
-router.put('/record/:id', updateSalaryRecord);
-
-// Delete salary record (Admin only)
-router.delete('/record/:id', deleteSalaryRecord);
+router.post('/process-bulk-payroll', protect, processBulkPayroll);
+router.post('/pay/:id', protect, paySalary);
+router.get('/records', protect, getAllSalaryRecords);
+router.get('/statistics', protect, getSalaryStatistics);
+router.get('/pending', protect, getPendingSalaries);
+router.put('/record/:id', protect, updateSalaryRecord);
+router.delete('/record/:id', protect, deleteSalaryRecord);
 
 // ==================== EMPLOYEE ACCESSIBLE ROUTES ====================
-// These routes work with BOTH admin AND employee tokens
+// 🔑 IMPORTANT: Employee can view their own salary data
 
-// Calculate salary breakdown (Employee can see their own)
-router.get('/calculate/:id', async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  const isEmployee = token && token === localStorage.getItem('employeeToken');
-  
-  // If employee, check if they're requesting their own data
-  if (isEmployee) {
-    const employeeId = req.employee?._id;
-    if (employeeId && employeeId.toString() !== req.params.id) {
-      return res.status(403).json({ success: false, message: "You can only view your own salary" });
-    }
-  }
-  next();
-}, calculateSalaryBreakdown);
-
-// Get salary history (Employee can see their own)
+// Get salary history - Employee can see their own
 router.get('/history/:id', async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   const isEmployee = token && localStorage.getItem('employeeToken');
   
-  // If employee, check if they're requesting their own data
   if (isEmployee) {
-    const employeeId = req.employee?._id;
-    if (employeeId && employeeId.toString() !== req.params.id) {
-      return res.status(403).json({ success: false, message: "You can only view your own salary history" });
+    // Check if employee is requesting their own data
+    try {
+      const employee = await Employee.findById(req.params.id);
+      if (!employee) return res.status(404).json({ success: false, message: "Employee not found" });
+      
+      // Use employee token to verify
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.id !== req.params.id) {
+        return res.status(403).json({ success: false, message: "You can only view your own salary" });
+      }
+      next();
+    } catch (err) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
+  } else {
+    // Admin access - use protect middleware
+    protect(req, res, next);
   }
-  next();
 }, getSalaryHistory);
 
-// Get salary record by ID (Employee can see their own)
+// Calculate salary breakdown - Employee can see their own
+router.get('/calculate/:id', async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  const isEmployee = token && localStorage.getItem('employeeToken');
+  
+  if (isEmployee) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.id !== req.params.id) {
+        return res.status(403).json({ success: false, message: "You can only view your own salary" });
+      }
+      next();
+    } catch (err) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+  } else {
+    protect(req, res, next);
+  }
+}, calculateSalaryBreakdown);
+
+// Get salary record by ID - Employee can see their own
 router.get('/record/:id', async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   const isEmployee = token && localStorage.getItem('employeeToken');
   
-  // If employee, check if they're requesting their own record
   if (isEmployee) {
-    const salaryRecord = await Salary.findById(req.params.id);
-    if (salaryRecord && salaryRecord.employeeId.toString() !== req.employee?._id.toString()) {
-      return res.status(403).json({ success: false, message: "You can only view your own salary records" });
+    try {
+      const salaryRecord = await Salary.findById(req.params.id);
+      if (!salaryRecord) return res.status(404).json({ success: false, message: "Record not found" });
+      
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.id !== salaryRecord.employeeId.toString()) {
+        return res.status(403).json({ success: false, message: "You can only view your own salary records" });
+      }
+      next();
+    } catch (err) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
+  } else {
+    protect(req, res, next);
   }
-  next();
 }, getSalaryRecordById);
 
 export default router;
