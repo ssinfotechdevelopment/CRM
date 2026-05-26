@@ -20,7 +20,8 @@ import leadRoutes from "./routes/leadRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
 import holidayRoutes from "./routes/holidayRoutes.js";
-
+import eventRoutes from "./routes/eventRoutes.js";
+import guestRoutes from "./routes/guestsController.js";
 
 dotenv.config();
 
@@ -95,6 +96,8 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/holidays", holidayRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/guests", guestRoutes);
 
 
 // ---------------- Serve Frontend in production ----------------
