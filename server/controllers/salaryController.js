@@ -1,12 +1,11 @@
-// src/controllers/salaryController.js
 import Employee from "../models/employeeModel.js";
 import Salary from "../models/salaryModel.js";
 import Attendance from "../models/attendenceModel.js";
 import Leave from "../models/leave.js";
 
-// Helper function to calculate daily rate (24 working days per month)
+// Helper function to calculate daily rate (22 working days per month)
 const calculateDailyRate = (monthlySalary) => {
-  return monthlySalary / 24;
+  return monthlySalary / 22; // Changed from 24 to 22
 };
 
 // Helper function to calculate hourly rate (9 hours per day)
@@ -72,17 +71,19 @@ export const calculateSalaryBreakdown = async (req, res) => {
       date: { $gte: startDate, $lte: endDate }
     });
     
-    // Get approved leaves for the month
+    // FIXED: Use 'employee' field instead of 'employeeId'
     const leaveRecords = await Leave.find({
-      employeeId: id,
+      employee: id,  // ✅ CORRECTED: changed from employeeId to employee
       status: "approved",
       startDate: { $lte: endDate },
       endDate: { $gte: startDate }
     });
     
+    console.log(`Found ${leaveRecords.length} leave records for employee ${employee.name}`);
+    
     // Calculate leave days
     const totalLeaveDays = calculateLeaveDays(leaveRecords, startDate, endDate);
-    const PAID_LEAVES_ALLOWED = 2; // 2 paid leaves per month
+    const PAID_LEAVES_ALLOWED = 2;
     const paidLeaves = Math.min(totalLeaveDays, PAID_LEAVES_ALLOWED);
     const unpaidLeaves = Math.max(0, totalLeaveDays - PAID_LEAVES_ALLOWED);
     
@@ -95,7 +96,7 @@ export const calculateSalaryBreakdown = async (req, res) => {
     
     // Calculate deductions and additions
     const leaveDeduction = unpaidLeaves * dailyRate;
-    const overtimePay = totalOvertimeHours * hourlyRate * 1.5; // 1.5x for overtime
+    const overtimePay = totalOvertimeHours * hourlyRate * 1.5;
     
     // Final salary calculation
     const finalSalary = (employee.salary || 0) - leaveDeduction + overtimePay;
@@ -151,7 +152,7 @@ export const calculateSalaryBreakdown = async (req, res) => {
 
 // Pay salary with automatic leave and overtime calculations
 export const paySalary = async (req, res) => {
-  const { id } = req.params; // employee ID
+  const { id } = req.params;
   const { month, year, notes, paymentMethod, transactionId } = req.body;
   
   const targetMonth = month || new Date().getMonth() + 1;
@@ -163,7 +164,7 @@ export const paySalary = async (req, res) => {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
     
-    // Check if salary already paid for this month
+    // Check if salary already paid
     const existingSalary = await Salary.findOne({
       employeeId: id,
       month: targetMonth,
@@ -177,19 +178,18 @@ export const paySalary = async (req, res) => {
       });
     }
     
-    // Date range for the month
     const startDate = new Date(targetYear, targetMonth - 1, 1);
     const endDate = new Date(targetYear, targetMonth, 0);
     
-    // Get attendance for the month
+    // Get attendance
     const attendanceRecords = await Attendance.find({
       employeeId: id,
       date: { $gte: startDate, $lte: endDate }
     });
     
-    // Get approved leaves for the month
+    // FIXED: Use 'employee' field
     const leaveRecords = await Leave.find({
-      employeeId: id,
+      employee: id,  // ✅ CORRECTED: changed from employeeId to employee
       status: "approved",
       startDate: { $lte: endDate },
       endDate: { $gte: startDate }
@@ -201,26 +201,23 @@ export const paySalary = async (req, res) => {
     const paidLeaves = Math.min(totalLeaveDays, PAID_LEAVES_ALLOWED);
     const unpaidLeaves = Math.max(0, totalLeaveDays - PAID_LEAVES_ALLOWED);
     
-    // Calculate overtime hours
+    // Calculate overtime
     const totalOvertimeHours = calculateOvertimeHours(attendanceRecords);
     
     // Calculate rates
     const dailyRate = calculateDailyRate(employee.salary || 0);
     const hourlyRate = calculateHourlyRate(employee.salary || 0);
     
-    // Calculate deductions and additions
     const leaveDeduction = unpaidLeaves * dailyRate;
     const overtimePay = totalOvertimeHours * hourlyRate * 1.5;
-    
-    // Final salary calculation
     const finalSalary = (employee.salary || 0) - leaveDeduction + overtimePay;
     
-    // Update employee salary fields
+    // Update employee
     employee.paidSalary = (employee.paidSalary || 0) + finalSalary;
     employee.pendingSalary = Math.max(0, (employee.pendingSalary || 0) - finalSalary);
     await employee.save();
     
-    // Create or update salary payment record
+    // Create salary record
     const salaryRecord = await Salary.findOneAndUpdate(
       {
         employeeId: id,
@@ -239,12 +236,10 @@ export const paySalary = async (req, res) => {
         paymentMethod: paymentMethod || "Bank Transfer",
         transactionId: transactionId || "",
         notes: notes || "",
-        // Leave tracking fields
         totalLeaves: totalLeaveDays,
         paidLeaves: paidLeaves,
         unpaidLeaves: unpaidLeaves,
         leaveDeduction: leaveDeduction,
-        // Overtime tracking fields
         totalOvertimeHours: totalOvertimeHours,
         overtimePay: overtimePay,
         finalSalary: finalSalary
@@ -288,7 +283,7 @@ export const paySalary = async (req, res) => {
 
 // Get salary history for an employee with detailed breakdowns
 export const getSalaryHistory = async (req, res) => {
-  const { id } = req.params; // employee ID
+  const { id } = req.params;
   
   try {
     const salaryHistory = await Salary.find({ employeeId: id })
@@ -297,7 +292,6 @@ export const getSalaryHistory = async (req, res) => {
     
     const employee = await Employee.findById(id).select('name email position department salary');
     
-    // Add summary statistics
     const totalPaid = salaryHistory.reduce((sum, record) => sum + (record.amount || 0), 0);
     const totalOvertimePaid = salaryHistory.reduce((sum, record) => sum + (record.overtimePay || 0), 0);
     const totalLeaveDeductions = salaryHistory.reduce((sum, record) => sum + (record.leaveDeduction || 0), 0);
@@ -344,7 +338,6 @@ export const getAllSalaryRecords = async (req, res) => {
     
     const total = await Salary.countDocuments(filter);
     
-    // Calculate summary statistics
     const summary = {
       totalSalaryPaid: salaryRecords.reduce((sum, r) => sum + (r.amount || 0), 0),
       totalOvertimePaid: salaryRecords.reduce((sum, r) => sum + (r.overtimePay || 0), 0),
@@ -385,7 +378,6 @@ export const getSalaryRecordById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Salary record not found" });
     }
     
-    // Add additional calculation details
     const dailyRate = calculateDailyRate(salaryRecord.baseSalary || salaryRecord.employeeId?.salary || 0);
     
     res.json({
@@ -395,7 +387,7 @@ export const getSalaryRecordById = async (req, res) => {
         calculations: {
           dailyRate: dailyRate,
           hourlyRate: dailyRate / 9,
-          monthlyWorkingDays: 24,
+          monthlyWorkingDays: 22,
           dailyWorkingHours: 9
         }
       }
@@ -421,7 +413,6 @@ export const updateSalaryRecord = async (req, res) => {
     const oldAmount = salaryRecord.amount;
     const newAmount = amount || salaryRecord.amount;
     
-    // If amount changed, adjust employee's salary fields
     if (amount && amount !== oldAmount && salaryRecord.status === "Paid") {
       const employee = await Employee.findById(salaryRecord.employeeId);
       if (employee) {
@@ -432,7 +423,6 @@ export const updateSalaryRecord = async (req, res) => {
       }
     }
     
-    // Update salary record
     const updatedRecord = await Salary.findByIdAndUpdate(
       id,
       {
@@ -471,7 +461,6 @@ export const deleteSalaryRecord = async (req, res) => {
       return res.status(404).json({ success: false, message: "Salary record not found" });
     }
     
-    // Adjust employee's salary fields if the record was paid
     if (salaryRecord.status === "Paid") {
       const employee = await Employee.findById(salaryRecord.employeeId);
       if (employee) {
@@ -500,7 +489,6 @@ export const getSalaryStatistics = async (req, res) => {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     
-    // Get current month statistics
     const currentMonthStats = await Salary.aggregate([
       {
         $match: {
@@ -522,7 +510,6 @@ export const getSalaryStatistics = async (req, res) => {
       }
     ]);
     
-    // Get current year statistics
     const yearlyStats = await Salary.aggregate([
       {
         $match: {
@@ -541,7 +528,6 @@ export const getSalaryStatistics = async (req, res) => {
       }
     ]);
     
-    // Monthly breakdown for current year
     const monthlyBreakdown = await Salary.aggregate([
       {
         $match: {
@@ -563,10 +549,8 @@ export const getSalaryStatistics = async (req, res) => {
       }
     ]);
     
-    // Get pending salaries count
     const pendingCount = await Salary.countDocuments({ status: "Pending" });
     
-    // Get employees with highest overtime
     const topOvertimeEmployees = await Salary.aggregate([
       {
         $match: {
@@ -631,20 +615,17 @@ export const getSalaryStatistics = async (req, res) => {
   }
 };
 
-// Get pending salaries (employees with pending payments)
+// Get pending salaries
 export const getPendingSalaries = async (req, res) => {
   try {
-    // Get pending salary records
     const pendingSalaryRecords = await Salary.find({
       status: "Pending"
     }).populate('employeeId', 'name email position department salary');
     
-    // Get employees with pending salaries
     const employeesWithPending = await Employee.find({
       pendingSalary: { $gt: 0 }
     }).select('name email position department pendingSalary paidSalary salary');
     
-    // Get current month pending status
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
@@ -686,7 +667,6 @@ export const processBulkPayroll = async (req, res) => {
   const targetYear = year || new Date().getFullYear();
   
   try {
-    // Get all active employees
     const employees = await Employee.find({ status: "active" });
     
     const results = [];
@@ -694,46 +674,39 @@ export const processBulkPayroll = async (req, res) => {
     
     for (const employee of employees) {
       try {
-        // Date range for the month
         const startDate = new Date(targetYear, targetMonth - 1, 1);
         const endDate = new Date(targetYear, targetMonth, 0);
         
-        // Get attendance and leaves
         const [attendanceRecords, leaveRecords] = await Promise.all([
           Attendance.find({
             employeeId: employee._id,
             date: { $gte: startDate, $lte: endDate }
           }),
           Leave.find({
-            employeeId: employee._id,
+            employee: employee._id, // ✅ CORRECTED: changed from employeeId to employee
             status: "approved",
             startDate: { $lte: endDate },
             endDate: { $gte: startDate }
           })
         ]);
         
-        // Calculate leave days
         const totalLeaveDays = calculateLeaveDays(leaveRecords, startDate, endDate);
         const PAID_LEAVES_ALLOWED = 2;
         const paidLeaves = Math.min(totalLeaveDays, PAID_LEAVES_ALLOWED);
         const unpaidLeaves = Math.max(0, totalLeaveDays - PAID_LEAVES_ALLOWED);
         
-        // Calculate overtime
         const totalOvertimeHours = calculateOvertimeHours(attendanceRecords);
         
-        // Calculate rates and final salary
         const dailyRate = calculateDailyRate(employee.salary || 0);
         const hourlyRate = calculateHourlyRate(employee.salary || 0);
         const leaveDeduction = unpaidLeaves * dailyRate;
         const overtimePay = totalOvertimeHours * hourlyRate * 1.5;
         const finalSalary = (employee.salary || 0) - leaveDeduction + overtimePay;
         
-        // Update employee salary fields
         employee.paidSalary = (employee.paidSalary || 0) + finalSalary;
         employee.pendingSalary = Math.max(0, (employee.pendingSalary || 0) - finalSalary);
         await employee.save();
         
-        // Create salary record
         const salaryRecord = await Salary.findOneAndUpdate(
           {
             employeeId: employee._id,
