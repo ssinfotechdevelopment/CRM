@@ -28,7 +28,8 @@ import EmployeeLiveStatus from "../pages/EmployeeLiveStatus";
 import AdminLeaveDashboard from "../pages/AdminLeaveDashboard";
 import TaskAdmin from "../pages/TaskAdmin";
 import AdminEventGuestManager from "../pages/AdminEventGuestManager";
-import AdminAttendanceMonitor from "../pages/AdminAttendanceMonitor"; 
+import AdminAttendanceMonitor from "../pages/AdminAttendanceMonitor";
+import SalaryManagement from "../pages/SalaryManagement"; // 👈 ADD THIS IMPORT
 
 // Professional color palette
 const colors = {
@@ -114,6 +115,11 @@ const MonitorIcon = ({ className = "w-5 h-5" }) => (
   <MdOutlineMonitorHeart className={className} />
 );
 
+// 👈 ADD SALARY ICON
+const SalaryIcon = ({ className = "w-5 h-5" }) => (
+  <PiCoins className={className} />
+);
+
 /* ----------  MAIN DASHBOARD LAYOUT  ---------- */
 const DashboardAdmin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -129,8 +135,8 @@ const DashboardAdmin = () => {
 
   const menuItems = [
     { path: ".", label: "Dashboard", icon: DashboardIcon },
-    // 👈 ATTENDANCE MONITOR - SECOND MENU ITEM
     { path: "attendance-monitor", label: "Attendance Monitor", icon: MonitorIcon },
+    { path: "salary-management", label: "Salary Management", icon: SalaryIcon }, // 👈 ADD THIS MENU ITEM
     { path: "employees", label: "Employee Management", icon: EmployeeIcon },
     { path: "student-management", label: "Student Management", icon: StudentIcon },
     { path: "monitoring-task", label: "Monitoring Task", icon: MdOutlineMonitor },
@@ -315,8 +321,11 @@ const DashboardAdmin = () => {
             <Routes>
               <Route index element={<Dashboard />} />
               
-              {/* 👇 NEW ROUTE - Attendance Monitor (2nd menu item) */}
+              {/* Attendance Monitor */}
               <Route path="attendance-monitor" element={<AdminAttendanceMonitor />} />
+              
+              {/* 👇 NEW ROUTE - Salary Management */}
+              <Route path="salary-management" element={<SalaryManagement />} />
               
               <Route path="student-management" element={<StudentManagement />} />
               <Route path="employees" element={<EmployeeManagement />} />

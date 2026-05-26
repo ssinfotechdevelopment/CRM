@@ -6,6 +6,7 @@ import StudentForm from "../pages/StudentForm";
 import DashboardAdmin from "../admin/components/DashboardAdmin";
 import DashboardEmployee from "../employee/components/DashboardEmployee";
 import AdminAttendanceMonitor from "../admin/pages/AdminAttendanceMonitor";
+import SalaryManagement from "../admin/pages/SalaryManagement"; // 👈 ADD THIS IMPORT
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -102,12 +103,22 @@ const AppRoutes = () => (
       } 
     />
 
-    {/* 👇 NEW ROUTE - Admin Attendance Monitor */}
+    {/* Admin Attendance Monitor */}
     <Route 
       path="/admin/attendance-monitor" 
       element={
         <ProtectedRoute requiredRole="admin">
           <AdminAttendanceMonitor />
+        </ProtectedRoute>
+      } 
+    />
+
+    {/* 👇 NEW ROUTE - Salary Management */}
+    <Route 
+      path="/admin/salary-management" 
+      element={
+        <ProtectedRoute requiredRole="admin">
+          <SalaryManagement />
         </ProtectedRoute>
       } 
     />
