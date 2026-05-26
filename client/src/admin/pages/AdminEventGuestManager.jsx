@@ -276,7 +276,7 @@ const AdminEventGuestManager = () => {
     }
 
     const API_BASE_EVENTS = "https://crm-backend-v2.onrender.com/events";
-    const API_BASE_GUESTS = "https://crm-backend-v2.onrender.com/api/guests";
+    const API_BASE_GUESTS = "https://crm-backend-v2.onrender.com/api/guests"; 
 
     // ── State ──────────────────────────────────────────────────────────────────
     const [events, setEvents]                               = useState([]);
