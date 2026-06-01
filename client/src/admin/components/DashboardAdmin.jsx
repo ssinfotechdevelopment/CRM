@@ -30,7 +30,7 @@ import TaskAdmin from "../pages/TaskAdmin";
 import AdminEventGuestManager from "../pages/AdminEventGuestManager";
 import AdminAttendanceMonitor from "../pages/AdminAttendanceMonitor";
 import SalaryManagement from "../pages/SalaryManagement"; // 👈 ADD THIS IMPORT
-
+import Admindocumentation from "../pages/Admindocumentation"; // 👈 ADD THIS IMPORT
 // Professional color palette
 const colors = {
   primary: "#0A2540",
@@ -120,6 +120,9 @@ const SalaryIcon = ({ className = "w-5 h-5" }) => (
   <PiCoins className={className} />
 );
 
+const DocumentationIcon = ({ className = "w-5 h-5" }) => (
+  <IoDocumentTextOutline className={className} />
+);
 /* ----------  MAIN DASHBOARD LAYOUT  ---------- */
 const DashboardAdmin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -150,7 +153,9 @@ const DashboardAdmin = () => {
     { path: "attendance", label: "Attendance", icon: AttendanceIcon },
     { path: "events", label: "Event Management", icon: EventIcon },
     { path: "reports", label: "Reports & Analytics", icon: ReportIcon },
+    { path: "documentation", label: "Documentation", icon: DocumentationIcon }, 
     { path: "settings", label: "Settings", icon: SettingsIcon },
+    // 👈 ADD THIS MENU ITEM
   ];
 
   /* ----  PROTECTED ROUTE CHECK  ---- */
@@ -339,6 +344,7 @@ const DashboardAdmin = () => {
               <Route path="employeeLeaveStatus" element={<AdminLeaveDashboard />} />
               <Route path="leadinsensitivemanagement" element={<LeadInsensitiveManagement />} />
               <Route path="events" element={<AdminEventGuestManager />} />
+              <Route path="documentation" element={<Admindocumentation/>}/>
               <Route path="guests" element={<AdminEventGuestManager />} />
               <Route path="reports" element={
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">

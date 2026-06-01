@@ -22,7 +22,7 @@ import leaveRoutes from "./routes/leaveRoutes.js";
 import holidayRoutes from "./routes/holidayRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import guestRoutes from "./routes/guestsController.js";
-
+import documentation from "./routes/documentationRoutes.js";
 dotenv.config();
 
 // For ESM dirname usage
@@ -98,8 +98,7 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/holidays", holidayRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/guests", guestRoutes);
-
-
+app.use("/api/documentation", documentation);
 // ---------------- Serve Frontend in production ----------------
 if (process.env.NODE_ENV === "production") {
   const frontendPath = path.join(__dirname, "client/dist");

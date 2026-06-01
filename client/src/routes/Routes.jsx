@@ -7,6 +7,7 @@ import DashboardAdmin from "../admin/components/DashboardAdmin";
 import DashboardEmployee from "../employee/components/DashboardEmployee";
 import AdminAttendanceMonitor from "../admin/pages/AdminAttendanceMonitor";
 import SalaryManagement from "../admin/pages/SalaryManagement"; // 👈 ADD THIS IMPORT
+import EmployeeDocumentation from "../employee/pages/Employeedocumentation";
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -135,6 +136,14 @@ const AppRoutes = () => (
     
     <Route 
       path="/employee/task" 
+      element={
+        <ProtectedRoute requiredRole="employee">
+          <EmployeeDocumentation />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/employee/documentation" 
       element={
         <ProtectedRoute requiredRole="employee">
           <DashboardEmployee />

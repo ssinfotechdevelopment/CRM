@@ -47,6 +47,7 @@ import EmployeeData from "../pages/EmployeeData";
 import LeadManagement from "../pages/LeadManagement";
 import LeaveApplicationForm from "../pages/LeaveApplicaationForm";
 import EmployeeTasks from "../pages/EmployeeTasks"
+import EmployeeDocumentation from "../pages/Employeedocumentation";
 
 /* ==================== DASHBOARD CONTENT ==================== */
 const DashboardContent = () => {
@@ -388,6 +389,7 @@ const DashboardEmployee = () => {
     { path: "/employee/dashboard/leadmanagement", label: "Lead Management", icon: <FaUserPlus className="text-base sm:text-xl" /> },
     { path: "/employee/dashboard/all/tasks", label: "My Tasks", icon: <SiGoogletasks className="text-base sm:text-xl" /> },
     { path: "/employee/dashboard/expense", label: "Expense", icon: <FaMoneyBillWave className="text-base sm:text-xl" /> },
+    { path: "/employee/dashboard/documentation", label: "Documentation", icon: <SiGoogleforms className="text-base sm:text-xl" /> },
     { path: "/employee/dashboard/settings", label: "Settings", icon: <FiSettings className="text-base sm:text-xl" /> },
   ];
 
@@ -404,6 +406,7 @@ const DashboardEmployee = () => {
           "/employee/dashboard/leadmanagement",
           "/employee/dashboard/expense",
           "/employee/dashboard/all/tasks",
+          "/employee/dashboard/documentation",
           "/employee/dashboard/settings",
         ];
         return allowedRoutes.includes(item.path);
@@ -427,6 +430,7 @@ const DashboardEmployee = () => {
         "/employee/dashboard/leadmanagement",
         "/employee/dashboard/expense",
         "/employee/dashboard/all/tasks",
+        "/employee/dashboard/documentation",
         "/employee/dashboard/settings",
       ];
       
@@ -618,6 +622,7 @@ const DashboardEmployee = () => {
               <Route path="leadmanagement" element={<LeadManagement />} />
               <Route path="all/tasks" element={<EmployeeTasks />} />
               <Route path="expense" element={<Expense />} />
+              <Route path="documentation" element={<EmployeeDocumentation />} />
               <Route path="settings" element={<EmployeeSettings />} />
               
               <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
