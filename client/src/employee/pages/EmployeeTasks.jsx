@@ -1,7 +1,7 @@
 // src/pages/employee/EmployeeTasks.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval, parseISO } from "date-fns";
 import {
   Plus,
   Edit,
@@ -12,17 +12,42 @@ import {
   RefreshCw,
   X,
   Loader2,
+  Search,
+  Download,
+  Filter,
+  ChevronDown,
+  CheckCircle,
+  Clock as ClockIcon,
+  AlertTriangle,
+  Circle,
+  Flag,
 } from "lucide-react";
 import { toast, Toaster } from "react-hot-toast";
+import * as XLSX from "xlsx";
 
 const API_BASE = "https://crm-backend-v2.onrender.com/api/employee";
 
 const EmployeeTasks = () => {
   const [tasks, setTasks] = useState([]);
+  const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentTask, setCurrentTask] = useState(null);
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState("all"); // all, week, month, year, custom
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  
+  // New filter states for status and priority
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedPriority, setSelectedPriority] = useState("all");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -65,7 +90,6 @@ const EmployeeTasks = () => {
         throw new Error(data.message || "Failed to load your tasks");
       }
 
-      // Handle different possible response shapes
       const taskList = Array.isArray(data)
         ? data
         : data.data || data.tasks || [];
@@ -83,6 +107,75 @@ const EmployeeTasks = () => {
   useEffect(() => {
     if (token) fetchTasks();
   }, [token, fetchTasks]);
+
+  // Apply filters
+  useEffect(() => {
+    let filtered = [...tasks];
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(task =>
+        task.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter(task => 
+        task.status?.toLowerCase() === selectedStatus.toLowerCase()
+      );
+    }
+
+    // Apply priority filter
+    if (selectedPriority !== "all") {
+      filtered = filtered.filter(task => 
+        task.priority?.toLowerCase() === selectedPriority.toLowerCase()
+      );
+    }
+
+    // Apply date filter
+    if (filterType !== "all" && filterType !== "custom") {
+      let startDate, endDate;
+      
+      switch (filterType) {
+        case "week":
+          startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
+          endDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
+          break;
+        case "month":
+          startDate = startOfMonth(selectedDate);
+          endDate = endOfMonth(selectedDate);
+          break;
+        case "year":
+          startDate = startOfYear(selectedDate);
+          endDate = endOfYear(selectedDate);
+          break;
+        default:
+          startDate = null;
+          endDate = null;
+      }
+
+      if (startDate && endDate) {
+        filtered = filtered.filter(task => {
+          if (!task.dueDate) return false;
+          const taskDate = parseISO(task.dueDate);
+          return isWithinInterval(taskDate, { start: startDate, end: endDate });
+        });
+      }
+    } else if (filterType === "custom" && customStartDate && customEndDate) {
+      const start = parseISO(customStartDate);
+      const end = parseISO(customEndDate);
+      filtered = filtered.filter(task => {
+        if (!task.dueDate) return false;
+        const taskDate = parseISO(task.dueDate);
+        return isWithinInterval(taskDate, { start: start, end: end });
+      });
+    }
+
+    setFilteredTasks(filtered);
+  }, [tasks, searchTerm, filterType, selectedDate, customStartDate, customEndDate, selectedStatus, selectedPriority]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -189,6 +282,50 @@ const EmployeeTasks = () => {
     }
   };
 
+  const downloadExcel = () => {
+    if (filteredTasks.length === 0) {
+      toast.error("No tasks to export");
+      return;
+    }
+
+    const exportData = filteredTasks.map(task => ({
+      "Title": task.title || "",
+      "Description": task.description || "",
+      "Type": task.type || "",
+      "Priority": task.priority || "",
+      "Status": task.status || "",
+      "Progress (%)": task.progress || 0,
+      "Due Date": task.dueDate ? format(new Date(task.dueDate), "dd MMM yyyy") : "—",
+      "Notes": task.notes || "",
+      "Created At": task.createdAt ? format(new Date(task.createdAt), "dd MMM yyyy HH:mm") : "—",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "My Tasks");
+    
+    // Auto-size columns
+    const colWidths = [];
+    for (let i = 0; i < Object.keys(exportData[0]).length; i++) {
+      colWidths.push({ wch: 20 });
+    }
+    ws['!cols'] = colWidths;
+
+    const fileName = `tasks_${format(new Date(), "yyyy-MM-dd_HH-mm")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    toast.success("Tasks exported successfully!");
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setFilterType("all");
+    setSelectedStatus("all");
+    setSelectedPriority("all");
+    setCustomStartDate("");
+    setCustomEndDate("");
+    setSelectedDate(new Date());
+  };
+
   const getPriorityColor = (priority) => {
     const colors = {
       low: "bg-green-100 text-green-800 border-green-300",
@@ -218,6 +355,51 @@ const EmployeeTasks = () => {
     }
   };
 
+  const getFilterLabel = () => {
+    switch (filterType) {
+      case "week":
+        return `Week of ${format(selectedDate, "dd MMM yyyy")}`;
+      case "month":
+        return format(selectedDate, "MMMM yyyy");
+      case "year":
+        return format(selectedDate, "yyyy");
+      case "custom":
+        return "Custom Range";
+      default:
+        return "All Tasks";
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return <CheckCircle className="w-4 h-4" />;
+      case "in progress":
+        return <ClockIcon className="w-4 h-4" />;
+      case "pending":
+        return <AlertTriangle className="w-4 h-4" />;
+      case "on hold":
+        return <Circle className="w-4 h-4" />;
+      default:
+        return null;
+    }
+  };
+
+  const getPriorityIcon = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case "urgent":
+        return <Flag className="w-4 h-4" />;
+      case "high":
+        return <AlertTriangle className="w-4 h-4" />;
+      case "medium":
+        return <ClockIcon className="w-4 h-4" />;
+      case "low":
+        return <Circle className="w-4 h-4" />;
+      default:
+        return null;
+    }
+  };
+
   if (!token) return null;
 
   return (
@@ -241,6 +423,341 @@ const EmployeeTasks = () => {
             </button>
           </div>
 
+          {/* Search and Filters Section */}
+          <div className="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search tasks by title, description, or notes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Controls */}
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Date Filter Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition bg-white"
+                >
+                  <Filter className="w-4 h-4" />
+                  <span className="font-medium">{getFilterLabel()}</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+
+                {showFilterDropdown && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg z-20 min-w-[200px]">
+                    <div className="p-2 space-y-1">
+                      <button
+                        onClick={() => {
+                          setFilterType("all");
+                          setShowFilterDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition"
+                      >
+                        All Tasks
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterType("week");
+                          setShowFilterDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition"
+                      >
+                        This Week
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterType("month");
+                          setShowFilterDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition"
+                      >
+                        This Month
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterType("year");
+                          setShowFilterDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition"
+                      >
+                        This Year
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterType("custom");
+                          setShowFilterDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition"
+                      >
+                        Custom Range
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Filter Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition bg-white"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="font-medium">
+                    {selectedStatus === "all" ? "All Status" : selectedStatus}
+                  </span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+
+                {showStatusDropdown && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg z-20 min-w-[180px]">
+                    <div className="p-2 space-y-1">
+                      <button
+                        onClick={() => {
+                          setSelectedStatus("all");
+                          setShowStatusDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <Circle className="w-4 h-4" />
+                        All Status
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedStatus("Pending");
+                          setShowStatusDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                        Pending
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedStatus("In Progress");
+                          setShowStatusDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <ClockIcon className="w-4 h-4 text-blue-600" />
+                        In Progress
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedStatus("Completed");
+                          setShowStatusDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        Completed
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedStatus("On Hold");
+                          setShowStatusDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <Circle className="w-4 h-4 text-purple-600" />
+                        On Hold
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Priority Filter Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition bg-white"
+                >
+                  <Flag className="w-4 h-4" />
+                  <span className="font-medium">
+                    {selectedPriority === "all" ? "All Priority" : selectedPriority}
+                  </span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+
+                {showPriorityDropdown && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg z-20 min-w-[180px]">
+                    <div className="p-2 space-y-1">
+                      <button
+                        onClick={() => {
+                          setSelectedPriority("all");
+                          setShowPriorityDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <Circle className="w-4 h-4" />
+                        All Priority
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPriority("urgent");
+                          setShowPriorityDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <Flag className="w-4 h-4 text-red-600" />
+                        Urgent
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPriority("high");
+                          setShowPriorityDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-orange-600" />
+                        High
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPriority("medium");
+                          setShowPriorityDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <ClockIcon className="w-4 h-4 text-blue-600" />
+                        Medium
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPriority("low");
+                          setShowPriorityDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded transition flex items-center gap-2"
+                      >
+                        <Circle className="w-4 h-4 text-green-600" />
+                        Low
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Date Pickers for specific filters */}
+              {(filterType === "week" || filterType === "month" || filterType === "year") && (
+                <input
+                  type={filterType === "year" ? "number" : "date"}
+                  value={
+                    filterType === "year"
+                      ? format(selectedDate, "yyyy")
+                      : format(selectedDate, "yyyy-MM-dd")
+                  }
+                  onChange={(e) => {
+                    if (filterType === "year") {
+                      const year = parseInt(e.target.value);
+                      if (!isNaN(year)) {
+                        setSelectedDate(new Date(year, 0, 1));
+                      }
+                    } else {
+                      setSelectedDate(new Date(e.target.value));
+                    }
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+              )}
+
+              {filterType === "custom" && (
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    placeholder="Start Date"
+                  />
+                  <span className="self-center">to</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    placeholder="End Date"
+                  />
+                </div>
+              )}
+
+              {/* Clear Filters Button */}
+              {(searchTerm || filterType !== "all" || selectedStatus !== "all" || selectedPriority !== "all") && (
+                <button
+                  onClick={clearAllFilters}
+                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition font-medium"
+                >
+                  Clear All Filters
+                </button>
+              )}
+
+              {/* Export Button */}
+              <button
+                onClick={downloadExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-sm ml-auto"
+              >
+                <Download className="w-4 h-4" />
+                Export to Excel
+              </button>
+            </div>
+
+            {/* Active Filters Display */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              {searchTerm && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md text-sm">
+                  Search: {searchTerm}
+                  <button onClick={() => setSearchTerm("")} className="hover:text-indigo-900">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {filterType !== "all" && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-sm">
+                  {getFilterLabel()}
+                  <button onClick={() => setFilterType("all")} className="hover:text-blue-900">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedStatus !== "all" && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-sm">
+                  Status: {selectedStatus}
+                  <button onClick={() => setSelectedStatus("all")} className="hover:text-yellow-900">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedPriority !== "all" && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-md text-sm">
+                  Priority: {selectedPriority}
+                  <button onClick={() => setSelectedPriority("all")} className="hover:text-orange-900">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+
+            {/* Filter Stats */}
+            <div className="text-sm text-gray-600">
+              Showing {filteredTasks.length} of {tasks.length} tasks
+            </div>
+          </div>
+
           {/* Tasks List */}
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
             <div className="px-6 py-5 border-b bg-gray-50 flex justify-between items-center">
@@ -260,20 +777,29 @@ const EmployeeTasks = () => {
                 <Loader2 className="w-12 h-12 animate-spin mx-auto text-indigo-600" />
                 <p className="mt-4">Loading your tasks...</p>
               </div>
-            ) : tasks.length === 0 ? (
+            ) : filteredTasks.length === 0 ? (
               <div className="p-16 text-center text-gray-500">
                 <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-40" />
-                <p className="text-lg">No tasks yet</p>
-                <button
-                  onClick={openCreateModal}
-                  className="mt-4 text-indigo-600 hover:underline font-medium"
-                >
-                  Create your first task →
-                </button>
+                <p className="text-lg">No tasks found</p>
+                {(searchTerm || filterType !== "all" || selectedStatus !== "all" || selectedPriority !== "all") ? (
+                  <button
+                    onClick={clearAllFilters}
+                    className="mt-4 text-indigo-600 hover:underline font-medium"
+                  >
+                    Clear all filters →
+                  </button>
+                ) : (
+                  <button
+                    onClick={openCreateModal}
+                    className="mt-4 text-indigo-600 hover:underline font-medium"
+                  >
+                    Create your first task →
+                  </button>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {tasks.map((task) => (
+                {filteredTasks.map((task) => (
                   <div
                     key={task._id}
                     className="p-6 hover:bg-gray-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -309,17 +835,19 @@ const EmployeeTasks = () => {
                           {task.type || "—"}
                         </span>
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(
                             task.priority
                           )}`}
                         >
+                          {getPriorityIcon(task.priority)}
                           {task.priority || "medium"}
                         </span>
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
                             task.status
                           )}`}
                         >
+                          {getStatusIcon(task.status)}
                           {task.status || "Pending"}
                         </span>
                         <span className="inline-flex items-center gap-1 text-gray-600">
