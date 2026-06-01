@@ -8,7 +8,7 @@ import {
 import { toast, Toaster } from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-const BASE = "http://localhost:5000/api";
+const BASE = "https://crm-backend-v2.onrender.com/api";
 
 const STATUS_BADGE = {
   Pending:  { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200", icon: Clock },

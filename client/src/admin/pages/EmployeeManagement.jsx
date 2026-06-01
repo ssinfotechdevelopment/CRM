@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 // ─── SVG ICONS ────────────────────────────────────────────────────────────────
 const UserIcon = ({ className = "w-5 h-5" }) => (
@@ -58,58 +63,30 @@ const RefreshIcon = ({ className = "w-4 h-4", spinning = false }) => (
   </svg>
 );
 
-// ─── SKELETON COMPONENTS ──────────────────────────────────────────────────────
+// ─── SKELETON ─────────────────────────────────────────────────────────────────
 const Shimmer = ({ className = "" }) => (
-  <div className={`animate-pulse bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:400%_100%] rounded ${className}`}
-    style={{ animation: "shimmer 1.4s ease infinite", backgroundSize: "400% 100%" }} />
+  <div className={`animate-pulse bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded ${className}`} />
 );
-
 const StatCardSkeleton = () => (
   <div className="bg-white rounded-xl shadow p-4 border-l-4 border-gray-200">
     <div className="flex items-center justify-between">
-      <div className="space-y-2">
-        <Shimmer className="h-3 w-16" />
-        <Shimmer className="h-7 w-10" />
-      </div>
+      <div className="space-y-2"><Shimmer className="h-3 w-16" /><Shimmer className="h-7 w-10" /></div>
       <Shimmer className="h-10 w-10 rounded-full" />
     </div>
   </div>
 );
-
 const TableRowSkeleton = () => (
   <tr className="border-b">
-    <td className="px-4 py-3">
-      <div className="flex items-center gap-2">
-        <Shimmer className="w-8 h-8 rounded-full" />
-        <div className="space-y-1.5">
-          <Shimmer className="h-3.5 w-28" />
-          <Shimmer className="h-2.5 w-36" />
-        </div>
-      </div>
-    </td>
+    <td className="px-4 py-3"><div className="flex items-center gap-2"><Shimmer className="w-8 h-8 rounded-full" /><div className="space-y-1.5"><Shimmer className="h-3.5 w-28" /><Shimmer className="h-2.5 w-36" /></div></div></td>
     <td className="px-3 py-3"><Shimmer className="h-3 w-20" /></td>
-    <td className="px-3 py-3">
-      <div className="space-y-1.5">
-        <Shimmer className="h-3 w-20" />
-        <Shimmer className="h-2.5 w-24" />
-      </div>
-    </td>
+    <td className="px-3 py-3"><div className="space-y-1.5"><Shimmer className="h-3 w-20" /><Shimmer className="h-2.5 w-24" /></div></td>
     <td className="px-3 py-3"><Shimmer className="h-3 w-16" /></td>
     <td className="px-3 py-3 text-center"><Shimmer className="h-5 w-12 rounded-full mx-auto" /></td>
     <td className="px-3 py-3 text-center"><Shimmer className="h-5 w-12 rounded-full mx-auto" /></td>
-    <td className="px-3 py-3 text-center">
-      <Shimmer className="h-3 w-8 mx-auto mb-1" />
-      <Shimmer className="h-1.5 w-full rounded-full" />
-    </td>
-    <td className="px-3 py-3">
-      <div className="flex justify-center gap-1">
-        {[...Array(4)].map((_, i) => <Shimmer key={i} className="w-7 h-7 rounded" />)}
-      </div>
-    </td>
+    <td className="px-3 py-3 text-center"><Shimmer className="h-3 w-8 mx-auto mb-1" /><Shimmer className="h-1.5 w-full rounded-full" /></td>
+    <td className="px-3 py-3"><div className="flex justify-center gap-1">{[...Array(4)].map((_, i) => <Shimmer key={i} className="w-7 h-7 rounded" />)}</div></td>
   </tr>
 );
-
-// Mini spinner for inline cell loading
 const CellSpinner = () => (
   <svg className="animate-spin w-3.5 h-3.5 text-gray-400 mx-auto" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -128,7 +105,7 @@ const DEPARTMENTS = [
 ];
 
 const API_URL = "https://crm-backend-v2.onrender.com/api";
-const BATCH_SIZE = 4; // load metrics for N employees at a time
+const BATCH_SIZE = 4;
 
 const EMPTY_NEW_EMP = {
   name: "", email: "", phone: "", department: "", position: "", salary: "",
@@ -144,7 +121,7 @@ const getPerformanceColor = (p) =>
 
 function useDebounce(value, delay = 300) {
   const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
+  React.useEffect(() => {
     const t = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(t);
   }, [value, delay]);
@@ -155,7 +132,11 @@ function useDebounce(value, delay = 300) {
 async function apiFetch(url, token, options = {}) {
   const res = await fetch(url, {
     ...options,
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", ...options.headers },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
   if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
   return res.json();
@@ -203,13 +184,11 @@ async function fetchMetricsForEmployee(employeeId, token) {
   const taskCompletion = tasksData.totalTasks > 0
     ? (tasksData.completedTasks / tasksData.totalTasks) * 100 : 0;
   const performance = Math.round(taskCompletion * 0.6 + attendanceData.attendanceRate * 0.4);
-  // ⚠️ Do NOT spread attendanceData.attendance (array of records) here —
-  // it would overwrite emp.attendance (the % number) and crash React rendering.
   return {
     tasks: tasksData.tasks,
     completedTasks: tasksData.completedTasks,
     totalTasks: tasksData.totalTasks,
-    attendance: attendanceData.attendanceRate,   // number (%)
+    attendance: attendanceData.attendanceRate,
     presentDays: attendanceData.presentDays,
     totalDays: attendanceData.totalDays,
     performance,
@@ -219,24 +198,20 @@ async function fetchMetricsForEmployee(employeeId, token) {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 const EmployeeManagement = () => {
   const token = localStorage.getItem("adminToken");
+  const queryClient = useQueryClient();
 
-  // Core state
-  const [employees, setEmployees]           = useState([]);
-  const [metricsMap, setMetricsMap]         = useState({});   // { [id]: metrics | "loading" | "error" }
-  const [loading, setLoading]               = useState(true);
-  const [error, setError]                   = useState("");
-  const [success, setSuccess]               = useState("");
-
-  // UI state
-  const [searchTerm, setSearchTerm]         = useState("");
-  const [sortBy, setSortBy]                 = useState("performance");
-  const [departmentFilter, setDepartmentFilter] = useState("all");
+  // ── UI STATE ───────────────────────────────────────────────────────────────
+  const [searchTerm, setSearchTerm]               = useState("");
+  const [sortBy, setSortBy]                       = useState("performance");
+  const [departmentFilter, setDepartmentFilter]   = useState("all");
   const [employeeTypeFilter, setEmployeeTypeFilter] = useState("all");
+  const [metricsMap, setMetricsMap]               = useState({});
+  const [success, setSuccess]                     = useState("");
 
   // Modal state
-  const [selectedEmployee, setSelectedEmployee]   = useState(null);
-  const [employeeTasks, setEmployeeTasks]         = useState([]);
-  const [employeeAttendance, setEmployeeAttendance] = useState([]);
+  const [selectedEmployee, setSelectedEmployee]       = useState(null);
+  const [employeeTasks, setEmployeeTasks]             = useState([]);
+  const [employeeAttendance, setEmployeeAttendance]   = useState([]);
   const [modals, setModals] = useState({
     add: false, edit: false, credentials: false,
     resetPassword: false, paySalary: false, tasks: false, attendance: false,
@@ -244,79 +219,56 @@ const EmployeeManagement = () => {
   const [newEmployeeCredentials, setNewEmployeeCredentials] = useState(null);
 
   // Form state
-  const [newEmployee, setNewEmployee] = useState(EMPTY_NEW_EMP);
+  const [newEmployee, setNewEmployee]         = useState(EMPTY_NEW_EMP);
   const [resetPasswordData, setResetPasswordData] = useState({ employeeId: "", employeeName: "", newPassword: "", confirmPassword: "" });
-  const [paySalaryData, setPaySalaryData] = useState({
+  const [paySalaryData, setPaySalaryData]     = useState({
     employeeId: "", employeeName: "", amount: "",
     month: new Date().getMonth() + 1, year: new Date().getFullYear(), notes: "",
   });
 
-  // Debounce search so we don't re-filter on every keystroke
+  const abortRef = useRef(null);
   const debouncedSearch = useDebounce(searchTerm, 250);
 
-  // Abort controller ref to cancel in-flight metric fetches on unmount / refresh
-  const abortRef = useRef(null);
-
-  // ── AUTH GUARD ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!token) {
-      alert("Admin not logged in. Redirecting...");
-      window.location.href = "/admin/login";
-    }
-  }, [token]);
-
-  // ── SUCCESS AUTO-CLEAR ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!success) return;
-    const t = setTimeout(() => setSuccess(""), 5000);
-    return () => clearTimeout(t);
-  }, [success]);
-
-  // ── OPEN / CLOSE MODALS ────────────────────────────────────────────────────
-  const openModal  = useCallback((key) => setModals(m => ({ ...m, [key]: true })),  []);
-  const closeModal = useCallback((key) => setModals(m => ({ ...m, [key]: false })), []);
-
-  // ── STEP 1: FETCH EMPLOYEES (fast — no metrics yet) ────────────────────────
-  const fetchEmployees = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError("");
-
-    // Cancel any running metric fetches from a previous load
-    if (abortRef.current) abortRef.current.abort();
-    abortRef.current = new AbortController();
-
-    try {
+  // ── REACT QUERY: FETCH ALL EMPLOYEES ──────────────────────────────────────
+  const {
+    data: employees = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["employees"],
+    queryFn: async () => {
+      if (!token) throw new Error("No token");
       const data = await apiFetch(`${API_URL}/employee/get/employee`, token);
       const list = Array.isArray(data) ? data : data.employees || data.data || [];
-      setEmployees(list);
 
-      // Immediately mark all as loading so cells show spinners
+      // Cancel previous metric fetches
+      if (abortRef.current) abortRef.current.abort();
+      abortRef.current = new AbortController();
+
+      // Mark all as loading
       const initial = {};
       list.forEach(e => { initial[e._id] = "loading"; });
       setMetricsMap(initial);
 
-      // STEP 2: Load metrics lazily in batches of BATCH_SIZE
+      // Load metrics in background batches
       loadMetricsInBatches(list, abortRef.current.signal);
-    } catch (err) {
+      return list;
+    },
+    staleTime: 1000 * 60 * 2, // 2 min cache — no re-fetch unless invalidated
+    onError: (err) => {
       if (err.status === 401) {
         localStorage.removeItem("adminToken");
         window.location.href = "/admin/login";
-        return;
       }
-      setError("Failed to load employees. Server may be down.");
-      setEmployees([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]); // eslint-disable-line
+    },
+  });
 
-  // ── STEP 2: BATCH LAZY-LOAD METRICS ───────────────────────────────────────
+  // ── BATCH METRICS LOADER ───────────────────────────────────────────────────
   const loadMetricsInBatches = useCallback(async (list, signal) => {
     for (let i = 0; i < list.length; i += BATCH_SIZE) {
       if (signal?.aborted) break;
       const batch = list.slice(i, i + BATCH_SIZE);
-
       await Promise.allSettled(
         batch.map(async (emp) => {
           try {
@@ -329,57 +281,206 @@ const EmployeeManagement = () => {
           }
         })
       );
-      // Small delay between batches to avoid hammering the server
       if (i + BATCH_SIZE < list.length) await new Promise(r => setTimeout(r, 150));
     }
   }, [token]);
 
-  useEffect(() => {
-    if (token) fetchEmployees();
-    return () => abortRef.current?.abort();
-  }, [token]); // eslint-disable-line
+  // ── AUTO CLEAR SUCCESS ─────────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(""), 5000);
+    return () => clearTimeout(t);
+  }, [success]);
 
-  // ── MERGED EMPLOYEE DATA (employees + metrics) ─────────────────────────────
-  const mergedEmployees = useMemo(() => employees.map(emp => {
-    const m = metricsMap[emp._id];
-    if (!m || m === "loading" || m === "error") {
-      return { ...emp, _metricsState: m || "loading", tasks: [], completedTasks: 0, totalTasks: 0, attendance: 0, performance: 0 };
-    }
-    return { ...emp, _metricsState: "ready", ...m };
-  }), [employees, metricsMap]);
+  // ── MODALS ─────────────────────────────────────────────────────────────────
+  const openModal  = useCallback((key) => setModals(m => ({ ...m, [key]: true })),  []);
+  const closeModal = useCallback((key) => setModals(m => ({ ...m, [key]: false })), []);
 
-  // ── FILTERED + SORTED LIST ─────────────────────────────────────────────────
-  const filteredAndSorted = useMemo(() => {
-    const search = debouncedSearch.toLowerCase();
-    return mergedEmployees
-      .filter(emp => (
-        (!search || emp.name?.toLowerCase().includes(search) || emp.email?.toLowerCase().includes(search) ||
-         emp.position?.toLowerCase().includes(search) || emp.loginId?.toLowerCase().includes(search)) &&
-        (departmentFilter === "all" || emp.department === +departmentFilter) &&
-        (employeeTypeFilter === "all" || emp.employeeType === employeeTypeFilter)
-      ))
-      .sort((a, b) => {
-        if (sortBy === "performance") return (b.performance || 0) - (a.performance || 0);
-        if (sortBy === "salary")      return (b.salary || 0) - (a.salary || 0);
-        if (sortBy === "name")        return (a.name || "").localeCompare(b.name || "");
-        return 0;
+  // ── ADD EMPLOYEE MUTATION ──────────────────────────────────────────────────
+  // ✅ Only adds new employee to cache — does NOT reload the whole list
+  const addMutation = useMutation({
+    mutationFn: async (empData) => {
+      const res = await fetch(`${API_URL}/employee/create/employee`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...empData, salary: +empData.salary, department: +empData.department }),
       });
-  }, [mergedEmployees, debouncedSearch, departmentFilter, employeeTypeFilter, sortBy]);
+      if (!res.ok) throw new Error("Failed to create employee");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      // ✅ OPTIMISTIC: inject new employee directly into cache
+      const newEmp = data.employee || data;
+      queryClient.setQueryData(["employees"], (old = []) => [...old, newEmp]);
 
-  // ── STATS (memoized) ───────────────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const total      = employees.length;
-    const active     = employees.filter(e => e.status === "Active").length;
-    const interns    = employees.filter(e => e.employeeType === "Intern").length;
-    const pending    = employees.filter(e => (e.pendingSalary || 0) > 0).length;
-    const readyCount = mergedEmployees.filter(e => e._metricsState === "ready").length;
-    const avgPerf    = readyCount > 0
-      ? Math.round(mergedEmployees.filter(e => e._metricsState === "ready").reduce((s, e) => s + (e.performance || 0), 0) / readyCount)
-      : 0;
-    return { total, active, interns, pending, avgPerf };
-  }, [employees, mergedEmployees]);
+      // ✅ Mark new employee metrics as loading and fetch
+      setMetricsMap(prev => ({ ...prev, [newEmp._id]: "loading" }));
+      fetchMetricsForEmployee(newEmp._id, token).then(metrics => {
+        setMetricsMap(prev => ({ ...prev, [newEmp._id]: metrics }));
+      });
+
+      setNewEmployeeCredentials({
+        name: newEmployee.name, email: newEmployee.email,
+        loginId: newEmployee.loginId, password: newEmployee.password,
+      });
+      openModal("credentials");
+      closeModal("add");
+      setSuccess("Employee created!");
+      setNewEmployee(EMPTY_NEW_EMP);
+    },
+    onError: () => alert("Failed to create employee"),
+  });
+
+  // ── UPDATE EMPLOYEE MUTATION ───────────────────────────────────────────────
+  // ✅ Only updates that ONE employee in cache — no full reload
+  const updateMutation = useMutation({
+    mutationFn: async (empData) => {
+      const payload = { ...empData, salary: +empData.salary, department: +empData.department };
+      delete payload.tasks; delete payload.attendance; delete payload.performance;
+      delete payload._metricsState; delete payload.completedTasks; delete payload.totalTasks;
+      const res = await fetch(`${API_URL}/employee/update/${empData._id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      return res.json();
+    },
+    onMutate: async (updatedEmp) => {
+      // ✅ OPTIMISTIC UPDATE: update cache immediately before API responds
+      await queryClient.cancelQueries({ queryKey: ["employees"] });
+      const previous = queryClient.getQueryData(["employees"]);
+      queryClient.setQueryData(["employees"], (old = []) =>
+        old.map(emp => emp._id === updatedEmp._id ? { ...emp, ...updatedEmp } : emp)
+      );
+      return { previous }; // rollback data
+    },
+    onError: (err, _, context) => {
+      // ✅ ROLLBACK if API call fails
+      queryClient.setQueryData(["employees"], context.previous);
+      alert("Update failed");
+    },
+    onSuccess: (data) => {
+      // ✅ Replace with server response for accuracy
+      const updated = data.employee || data;
+      queryClient.setQueryData(["employees"], (old = []) =>
+        old.map(emp => emp._id === updated._id ? { ...emp, ...updated } : emp)
+      );
+      closeModal("edit");
+      setSelectedEmployee(null);
+      setSuccess("Employee updated!");
+    },
+  });
+
+  // ── DELETE EMPLOYEE MUTATION ───────────────────────────────────────────────
+  // ✅ Only removes that employee from cache
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const res = await fetch(`${API_URL}/employee/delete/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      return id;
+    },
+    onMutate: async (id) => {
+      // ✅ OPTIMISTIC: remove from list immediately
+      await queryClient.cancelQueries({ queryKey: ["employees"] });
+      const previous = queryClient.getQueryData(["employees"]);
+      queryClient.setQueryData(["employees"], (old = []) =>
+        old.filter(emp => emp._id !== id)
+      );
+      return { previous };
+    },
+    onError: (err, _, context) => {
+      queryClient.setQueryData(["employees"], context.previous);
+      alert("Delete failed");
+    },
+    onSuccess: (id) => {
+      setMetricsMap(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setSuccess("Employee deleted!");
+    },
+  });
+
+  // ── RESET PASSWORD MUTATION ────────────────────────────────────────────────
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ employeeId, newPassword }) => {
+      const res = await fetch(`${API_URL}/employee/${employeeId}/reset-password`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!res.ok) throw new Error("Reset failed");
+      return res.json();
+    },
+    onSuccess: (_, { employeeId, newPassword }) => {
+      const emp = employees.find(e => e._id === employeeId);
+      setNewEmployeeCredentials({ name: emp.name, email: emp.email, loginId: emp.loginId, password: newPassword });
+      closeModal("resetPassword");
+      openModal("credentials");
+      setSuccess("Password reset successfully!");
+    },
+    onError: () => alert("Password reset failed"),
+  });
+
+  // ── PAY SALARY MUTATION ────────────────────────────────────────────────────
+  const paySalaryMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch(`${API_URL}/salary/pay/${data.employeeId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: parseFloat(data.amount), month: data.month, year: data.year, notes: data.notes }),
+      });
+      if (!res.ok) throw new Error("Payment failed");
+      return { ...data };
+    },
+    onSuccess: ({ employeeId, amount }) => {
+      // ✅ Only update salary fields for that employee in cache
+      queryClient.setQueryData(["employees"], (old = []) =>
+        old.map(emp => emp._id === employeeId
+          ? { ...emp, pendingSalary: Math.max(0, (emp.pendingSalary || 0) - amount), paidSalary: (emp.paidSalary || 0) + amount }
+          : emp
+        )
+      );
+      closeModal("paySalary");
+      setSuccess("Salary paid successfully!");
+    },
+    onError: () => alert("Salary payment failed"),
+  });
 
   // ── HANDLERS ──────────────────────────────────────────────────────────────
+  const handleAdd = useCallback((e) => {
+    e.preventDefault();
+    const required = ["name","email","department","position","salary","joiningDate","loginId","password"];
+    if (required.some(f => !newEmployee[f])) { alert("Please fill all required fields"); return; }
+    if (newEmployee.password.length < 6) { alert("Password must be ≥ 6 characters"); return; }
+    addMutation.mutate(newEmployee);
+  }, [newEmployee, addMutation]);
+
+  const handleEdit = useCallback((e) => {
+    e.preventDefault();
+    if (!selectedEmployee) return;
+    updateMutation.mutate(selectedEmployee);
+  }, [selectedEmployee, updateMutation]);
+
+  const handleDelete = useCallback((id) => {
+    if (!confirm("Delete this employee?")) return;
+    deleteMutation.mutate(id);
+  }, [deleteMutation]);
+
+  const handleResetPassword = useCallback((e) => {
+    e.preventDefault();
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) { alert("Passwords don't match"); return; }
+    if (resetPasswordData.newPassword.length < 6) { alert("Min 6 characters"); return; }
+    resetPasswordMutation.mutate({ employeeId: resetPasswordData.employeeId, newPassword: resetPasswordData.newPassword });
+  }, [resetPasswordData, resetPasswordMutation]);
+
+  const handlePaySalary = useCallback((e) => {
+    e.preventDefault();
+    if (!paySalaryData.amount || paySalaryData.amount <= 0) { alert("Enter a valid amount"); return; }
+    paySalaryMutation.mutate(paySalaryData);
+  }, [paySalaryData, paySalaryMutation]);
+
   const openResetPasswordModal = useCallback((emp) => {
     setResetPasswordData({ employeeId: emp._id, employeeName: emp.name, newPassword: "", confirmPassword: "" });
     openModal("resetPassword");
@@ -393,88 +494,6 @@ const EmployeeManagement = () => {
     });
     openModal("paySalary");
   }, [openModal]);
-
-  const handleResetPassword = useCallback(async (e) => {
-    e.preventDefault();
-    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) { alert("Passwords don't match"); return; }
-    if (resetPasswordData.newPassword.length < 6) { alert("Password must be at least 6 characters"); return; }
-    try {
-      const res = await fetch(`${API_URL}/employee/${resetPasswordData.employeeId}/reset-password`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ newPassword: resetPasswordData.newPassword }),
-      });
-      if (res.ok) {
-        const emp = employees.find(e => e._id === resetPasswordData.employeeId);
-        setNewEmployeeCredentials({ name: emp.name, email: emp.email, loginId: emp.loginId, password: resetPasswordData.newPassword });
-        closeModal("resetPassword");
-        openModal("credentials");
-        setSuccess("Password reset successfully!");
-      } else { alert("Password reset failed"); }
-    } catch { alert("Network error"); }
-  }, [resetPasswordData, employees, token, openModal, closeModal]);
-
-  const handlePaySalary = useCallback(async (e) => {
-    e.preventDefault();
-    if (!paySalaryData.amount || paySalaryData.amount <= 0) { alert("Enter a valid amount"); return; }
-    try {
-      const res = await fetch(`${API_URL}/salary/pay/${paySalaryData.employeeId}`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: parseFloat(paySalaryData.amount), month: paySalaryData.month, year: paySalaryData.year, notes: paySalaryData.notes }),
-      });
-      if (res.ok) { closeModal("paySalary"); fetchEmployees(); setSuccess("Salary paid successfully!"); }
-      else alert("Salary payment failed");
-    } catch { alert("Network error"); }
-  }, [paySalaryData, token, closeModal, fetchEmployees]);
-
-  const handleAdd = useCallback(async (e) => {
-    e.preventDefault();
-    const required = ["name","email","department","position","salary","joiningDate","loginId","password"];
-    if (required.some(f => !newEmployee[f])) { alert("Please fill all required fields"); return; }
-    if (newEmployee.password.length < 6) { alert("Password must be ≥ 6 characters"); return; }
-    try {
-      const res = await fetch(`${API_URL}/employee/create/employee`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newEmployee, salary: +newEmployee.salary, department: +newEmployee.department }),
-      });
-      if (res.ok) {
-        setNewEmployeeCredentials({ name: newEmployee.name, email: newEmployee.email, loginId: newEmployee.loginId, password: newEmployee.password });
-        openModal("credentials");
-        closeModal("add");
-        fetchEmployees();
-        setSuccess("Employee created!");
-        setNewEmployee(EMPTY_NEW_EMP);
-      } else alert("Failed to create employee");
-    } catch { alert("Network error"); }
-  }, [newEmployee, token, openModal, closeModal, fetchEmployees]);
-
-  const handleEdit = useCallback(async (e) => {
-    e.preventDefault();
-    if (!selectedEmployee) return;
-    const payload = { ...selectedEmployee, salary: +selectedEmployee.salary, department: +selectedEmployee.department };
-    delete payload.tasks; delete payload.attendance; delete payload.performance;
-    delete payload._metricsState; delete payload.completedTasks; delete payload.totalTasks;
-    try {
-      const res = await fetch(`${API_URL}/employee/update/${selectedEmployee._id}`, {
-        method: "PATCH",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) { fetchEmployees(); closeModal("edit"); setSelectedEmployee(null); setSuccess("Employee updated!"); }
-      else alert("Update failed");
-    } catch { alert("Network error"); }
-  }, [selectedEmployee, token, closeModal, fetchEmployees]);
-
-  const handleDelete = useCallback(async (id) => {
-    if (!confirm("Delete this employee?")) return;
-    try {
-      const res = await fetch(`${API_URL}/employee/delete/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-      if (res.ok) { fetchEmployees(); setSuccess("Employee deleted!"); }
-      else alert("Delete failed");
-    } catch { alert("Network error"); }
-  }, [token, fetchEmployees]);
 
   const fetchAndShowTasks = useCallback(async (emp) => {
     setSelectedEmployee(emp);
@@ -499,19 +518,53 @@ const EmployeeManagement = () => {
     ).then(() => alert("Copied!"));
   }, [newEmployeeCredentials]);
 
-  // ── SHARED INPUT CLASSES ───────────────────────────────────────────────────
+  // ── MERGED EMPLOYEES (employees + metricsMap) ──────────────────────────────
+  const mergedEmployees = useMemo(() => employees.map(emp => {
+    const m = metricsMap[emp._id];
+    if (!m || m === "loading" || m === "error") {
+      return { ...emp, _metricsState: m || "loading", tasks: [], completedTasks: 0, totalTasks: 0, attendance: 0, performance: 0 };
+    }
+    return { ...emp, _metricsState: "ready", ...m };
+  }), [employees, metricsMap]);
+
+  // ── FILTERED + SORTED ──────────────────────────────────────────────────────
+  const filteredAndSorted = useMemo(() => {
+    const search = debouncedSearch.toLowerCase();
+    return mergedEmployees
+      .filter(emp => (
+        (!search || emp.name?.toLowerCase().includes(search) || emp.email?.toLowerCase().includes(search) ||
+          emp.position?.toLowerCase().includes(search) || emp.loginId?.toLowerCase().includes(search)) &&
+        (departmentFilter === "all" || emp.department === +departmentFilter) &&
+        (employeeTypeFilter === "all" || emp.employeeType === employeeTypeFilter)
+      ))
+      .sort((a, b) => {
+        if (sortBy === "performance") return (b.performance || 0) - (a.performance || 0);
+        if (sortBy === "salary")      return (b.salary || 0) - (a.salary || 0);
+        if (sortBy === "name")        return (a.name || "").localeCompare(b.name || "");
+        return 0;
+      });
+  }, [mergedEmployees, debouncedSearch, departmentFilter, employeeTypeFilter, sortBy]);
+
+  // ── STATS ──────────────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const total   = employees.length;
+    const active  = employees.filter(e => e.status === "Active").length;
+    const interns = employees.filter(e => e.employeeType === "Intern").length;
+    const pending = employees.filter(e => (e.pendingSalary || 0) > 0).length;
+    const readyList = mergedEmployees.filter(e => e._metricsState === "ready");
+    const avgPerf = readyList.length > 0
+      ? Math.round(readyList.reduce((s, e) => s + (e.performance || 0), 0) / readyList.length) : 0;
+    return { total, active, interns, pending, avgPerf };
+  }, [employees, mergedEmployees]);
+
   const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
   const labelCls = "block text-sm font-medium text-gray-700 mb-1";
 
   if (!token) return <div className="min-h-screen flex items-center justify-center">Redirecting…</div>;
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <style>{`
-        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-        .animate-shimmer { animation: shimmer 1.4s ease infinite; background: linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%); background-size: 400% 100%; }
-      `}</style>
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
@@ -519,33 +572,32 @@ const EmployeeManagement = () => {
           {/* HEADER */}
           <div className="text-center mb-6">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Employee Management</h1>
-            <p className="text-gray-500 mt-1 text-sm">Real-time sync · Metrics load progressively</p>
+            <p className="text-gray-500 mt-1 text-sm">Optimistic updates · No full-page reloads</p>
           </div>
 
           {/* ALERTS */}
-          {error && (
+          {isError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex justify-between items-center">
-              <span>{error}</span>
-              <button onClick={() => setError("")} className="text-red-700 font-bold text-lg">×</button>
+              <span>Failed to load employees. Server may be down.</span>
+              <button onClick={() => refetch()} className="underline text-sm">Retry</button>
             </div>
           )}
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+              <CheckCircleIcon className="w-4 h-4" />
               {success}
             </div>
           )}
 
           {/* STATS */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
-            {loading ? (
-              [...Array(5)].map((_, i) => <StatCardSkeleton key={i} />)
-            ) : (
+            {isLoading ? [...Array(5)].map((_, i) => <StatCardSkeleton key={i} />) : (
               [
-                { label: "Total",       value: stats.total,   color: "#3B82F6", bg: "bg-blue-100",   icon: UserIcon,        ic: "text-blue-600" },
-                { label: "Active",      value: stats.active,  color: "#10B981", bg: "bg-green-100",  icon: CheckCircleIcon, ic: "text-green-600" },
-                { label: "Interns",     value: stats.interns, color: "#8B5CF6", bg: "bg-purple-100", icon: DepartmentIcon,  ic: "text-purple-600" },
-                { label: "Pending Pay", value: stats.pending, color: "#EF4444", bg: "bg-red-100",    icon: SalaryIcon,      ic: "text-red-600" },
-                { label: "Avg Perf",    value: `${stats.avgPerf}%`, color: "#F97316", bg: "bg-orange-100", icon: PerformanceIcon, ic: "text-orange-600" },
+                { label: "Total",       value: stats.total,          color: "#3B82F6", bg: "bg-blue-100",   icon: UserIcon,        ic: "text-blue-600" },
+                { label: "Active",      value: stats.active,         color: "#10B981", bg: "bg-green-100",  icon: CheckCircleIcon, ic: "text-green-600" },
+                { label: "Interns",     value: stats.interns,        color: "#8B5CF6", bg: "bg-purple-100", icon: DepartmentIcon,  ic: "text-purple-600" },
+                { label: "Pending Pay", value: stats.pending,        color: "#EF4444", bg: "bg-red-100",    icon: SalaryIcon,      ic: "text-red-600" },
+                { label: "Avg Perf",    value: `${stats.avgPerf}%`,  color: "#F97316", bg: "bg-orange-100", icon: PerformanceIcon, ic: "text-orange-600" },
               ].map((s, i) => (
                 <div key={i} className="bg-white rounded-xl shadow p-4 border-l-4" style={{ borderLeftColor: s.color }}>
                   <div className="flex items-center justify-between">
@@ -592,9 +644,7 @@ const EmployeeManagement = () => {
                   </select>
                   <div className="relative">
                     <input
-                      type="text"
-                      placeholder="Search…"
-                      value={searchTerm}
+                      type="text" placeholder="Search…" value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                       className="pl-7 pr-3 py-1.5 text-xs border rounded-md w-40"
                     />
@@ -604,9 +654,9 @@ const EmployeeManagement = () => {
                     className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs flex items-center gap-1">
                     <UserIcon className="w-3.5 h-3.5" /> Add Employee
                   </button>
-                  <button onClick={fetchEmployees}
+                  <button onClick={() => refetch()}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-xs flex items-center gap-1 border">
-                    <RefreshIcon className="w-3.5 h-3.5" spinning={loading} /> Refresh
+                    <RefreshIcon className="w-3.5 h-3.5" spinning={isLoading} /> Refresh
                   </button>
                 </div>
               </div>
@@ -628,7 +678,7 @@ const EmployeeManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {loading ? (
+                  {isLoading ? (
                     [...Array(6)].map((_, i) => <TableRowSkeleton key={i} />)
                   ) : filteredAndSorted.length === 0 ? (
                     <tr>
@@ -640,16 +690,17 @@ const EmployeeManagement = () => {
                     const dept    = DEPARTMENTS.find(d => d.id === emp.department);
                     const loading = emp._metricsState === "loading";
                     const hasPend = (emp.pendingSalary || 0) > 0;
-                    const taskPct = emp.totalTasks > 0
-                      ? Math.round((emp.completedTasks / emp.totalTasks) * 100) : 0;
+                    const taskPct = emp.totalTasks > 0 ? Math.round((emp.completedTasks / emp.totalTasks) * 100) : 0;
+                    const isDeleting = deleteMutation.isLoading && deleteMutation.variables === emp._id;
+                    const isUpdating = updateMutation.isLoading && updateMutation.variables?._id === emp._id;
 
                     return (
-                      <tr key={emp._id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={emp._id} className={`hover:bg-gray-50 transition-colors ${isDeleting || isUpdating ? "opacity-50" : ""}`}>
                         {/* Employee */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                              {emp.name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+                              {emp.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0">
                               <div className="font-medium truncate">{emp.name}</div>
@@ -657,23 +708,15 @@ const EmployeeManagement = () => {
                             </div>
                           </div>
                         </td>
-
-                        {/* Login ID */}
                         <td className="px-3 py-3 font-mono text-xs text-gray-600">{emp.loginId}</td>
-
-                        {/* Dept / Role */}
                         <td className="px-3 py-3 text-xs">
                           <div className="font-medium text-gray-700">{dept?.name || "—"}</div>
                           <div className="text-gray-400">{emp.position}</div>
                         </td>
-
-                        {/* Salary */}
                         <td className="px-3 py-3 text-xs">
                           <div>₹{emp.salary?.toLocaleString() || "0"}</div>
                           {hasPend && <div className="text-red-500">₹{emp.pendingSalary?.toLocaleString()} due</div>}
                         </td>
-
-                        {/* Performance */}
                         <td className="px-3 py-3 text-center">
                           {loading ? <CellSpinner /> : (
                             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold border ${getPerformanceColor(emp.performance)}`}>
@@ -681,8 +724,6 @@ const EmployeeManagement = () => {
                             </span>
                           )}
                         </td>
-
-                        {/* Attendance */}
                         <td className="px-3 py-3 text-center">
                           {loading ? <CellSpinner /> : (
                             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold border ${getPerformanceColor(emp.attendance)}`}>
@@ -690,8 +731,6 @@ const EmployeeManagement = () => {
                             </span>
                           )}
                         </td>
-
-                        {/* Tasks */}
                         <td className="px-3 py-3 text-center text-xs">
                           {loading ? <CellSpinner /> : (
                             <>
@@ -702,32 +741,26 @@ const EmployeeManagement = () => {
                             </>
                           )}
                         </td>
-
-                        {/* Actions */}
                         <td className="px-3 py-3">
                           <div className="flex justify-center gap-1">
-                            <button onClick={() => setSelectedEmployee(emp)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="View">
+                            <button onClick={() => setSelectedEmployee(emp)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="View">
                               <EyeIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => { setSelectedEmployee(emp); openModal("edit"); }}
-                              className="p-1.5 text-amber-600 hover:bg-amber-50 rounded" title="Edit">
+                            <button onClick={() => { setSelectedEmployee(emp); openModal("edit"); }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded" title="Edit">
                               <EditIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => openResetPasswordModal(emp)}
-                              className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Reset Password">
+                            <button onClick={() => openResetPasswordModal(emp)} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Reset Password">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
                             </button>
                             {hasPend && (
-                              <button onClick={() => openPaySalaryModal(emp)}
-                                className="p-1.5 text-teal-600 hover:bg-teal-50 rounded" title="Pay Salary">
+                              <button onClick={() => openPaySalaryModal(emp)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded" title="Pay Salary">
                                 <CheckCircleIcon className="w-4 h-4" />
                               </button>
                             )}
-                            <button onClick={() => handleDelete(emp._id)}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">
+                            <button onClick={() => handleDelete(emp._id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete"
+                              disabled={isDeleting}>
                               <DeleteIcon className="w-4 h-4" />
                             </button>
                           </div>
@@ -739,23 +772,21 @@ const EmployeeManagement = () => {
               </table>
             </div>
 
-            {/* Progress bar for metric loading */}
-            {!loading && employees.length > 0 && (
-              (() => {
-                const ready = Object.values(metricsMap).filter(v => v !== "loading").length;
-                const total = employees.length;
-                const pct   = Math.round((ready / total) * 100);
-                if (pct >= 100) return null;
-                return (
-                  <div className="px-4 py-2 border-t bg-gray-50 flex items-center gap-3 text-xs text-gray-500">
-                    <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                      <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span>Loading metrics… {ready}/{total}</span>
+            {/* Metrics progress bar */}
+            {!isLoading && employees.length > 0 && (() => {
+              const ready = Object.values(metricsMap).filter(v => v !== "loading").length;
+              const total = employees.length;
+              const pct   = Math.round((ready / total) * 100);
+              if (pct >= 100) return null;
+              return (
+                <div className="px-4 py-2 border-t bg-gray-50 flex items-center gap-3 text-xs text-gray-500">
+                  <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                    <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
                   </div>
-                );
-              })()
-            )}
+                  <span>Loading metrics… {ready}/{total}</span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── MODALS ──────────────────────────────────────────────────────── */}
@@ -789,15 +820,13 @@ const EmployeeManagement = () => {
               <form onSubmit={handleResetPassword} className="space-y-4">
                 <div>
                   <label className={labelCls}>New Password *</label>
-                  <input type="password" required minLength={6} className={inputCls}
-                    placeholder="Min 6 characters"
+                  <input type="password" required minLength={6} className={inputCls} placeholder="Min 6 characters"
                     value={resetPasswordData.newPassword}
                     onChange={e => setResetPasswordData(p => ({ ...p, newPassword: e.target.value }))} />
                 </div>
                 <div>
                   <label className={labelCls}>Confirm Password *</label>
-                  <input type="password" required minLength={6} className={inputCls}
-                    placeholder="Re-enter password"
+                  <input type="password" required minLength={6} className={inputCls} placeholder="Re-enter password"
                     value={resetPasswordData.confirmPassword}
                     onChange={e => setResetPasswordData(p => ({ ...p, confirmPassword: e.target.value }))} />
                 </div>
@@ -805,12 +834,9 @@ const EmployeeManagement = () => {
                   resetPasswordData.newPassword !== resetPasswordData.confirmPassword && (
                   <p className="text-red-500 text-xs">Passwords do not match</p>
                 )}
-                <ModalFooter
-                  onCancel={() => closeModal("resetPassword")}
-                  submitLabel="Reset Password"
-                  disabled={!resetPasswordData.newPassword || !resetPasswordData.confirmPassword ||
-                    resetPasswordData.newPassword !== resetPasswordData.confirmPassword ||
-                    resetPasswordData.newPassword.length < 6} />
+                <ModalFooter onCancel={() => closeModal("resetPassword")} submitLabel="Reset Password"
+                  disabled={resetPasswordMutation.isLoading || !resetPasswordData.newPassword || !resetPasswordData.confirmPassword ||
+                    resetPasswordData.newPassword !== resetPasswordData.confirmPassword || resetPasswordData.newPassword.length < 6} />
               </form>
             </Modal>
           )}
@@ -825,8 +851,7 @@ const EmployeeManagement = () => {
                 <div>
                   <label className={labelCls}>Amount (₹) *</label>
                   <input type="number" required min="0" step="0.01" className={inputCls}
-                    value={paySalaryData.amount}
-                    onChange={e => setPaySalaryData(p => ({ ...p, amount: e.target.value }))} />
+                    value={paySalaryData.amount} onChange={e => setPaySalaryData(p => ({ ...p, amount: e.target.value }))} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -846,12 +871,11 @@ const EmployeeManagement = () => {
                 <div>
                   <label className={labelCls}>Notes</label>
                   <textarea rows={3} className={inputCls} placeholder="Optional notes"
-                    value={paySalaryData.notes}
-                    onChange={e => setPaySalaryData(p => ({ ...p, notes: e.target.value }))} />
+                    value={paySalaryData.notes} onChange={e => setPaySalaryData(p => ({ ...p, notes: e.target.value }))} />
                 </div>
                 <ModalFooter onCancel={() => closeModal("paySalary")} submitLabel="Pay Salary"
                   submitClass="bg-green-500 hover:bg-green-600"
-                  disabled={!paySalaryData.amount || paySalaryData.amount <= 0} />
+                  disabled={paySalaryMutation.isLoading || !paySalaryData.amount || paySalaryData.amount <= 0} />
               </form>
             </Modal>
           )}
@@ -861,7 +885,9 @@ const EmployeeManagement = () => {
             <Modal onClose={() => { closeModal("add"); setNewEmployee(EMPTY_NEW_EMP); }} title="Add New Employee" wide>
               <form onSubmit={handleAdd} className="space-y-4">
                 <EmpFormFields emp={newEmployee} setEmp={setNewEmployee} showCredentials inputCls={inputCls} labelCls={labelCls} />
-                <ModalFooter onCancel={() => { closeModal("add"); setNewEmployee(EMPTY_NEW_EMP); }} submitLabel="Create Employee" />
+                <ModalFooter onCancel={() => { closeModal("add"); setNewEmployee(EMPTY_NEW_EMP); }}
+                  submitLabel={addMutation.isLoading ? "Creating…" : "Create Employee"}
+                  disabled={addMutation.isLoading} />
               </form>
             </Modal>
           )}
@@ -871,7 +897,9 @@ const EmployeeManagement = () => {
             <Modal onClose={() => { closeModal("edit"); setSelectedEmployee(null); }} title="Edit Employee" wide>
               <form onSubmit={handleEdit} className="space-y-4">
                 <EmpFormFields emp={selectedEmployee} setEmp={setSelectedEmployee} inputCls={inputCls} labelCls={labelCls} />
-                <ModalFooter onCancel={() => { closeModal("edit"); setSelectedEmployee(null); }} submitLabel="Update Employee" />
+                <ModalFooter onCancel={() => { closeModal("edit"); setSelectedEmployee(null); }}
+                  submitLabel={updateMutation.isLoading ? "Updating…" : "Update Employee"}
+                  disabled={updateMutation.isLoading} />
               </form>
             </Modal>
           )}
@@ -1048,17 +1076,11 @@ const EmpFormFields = ({ emp, setEmp, showCredentials = false, inputCls, labelCl
       <div><label className={labelCls}>Joining Date *</label><input type="date" required {...f("joiningDate")} /></div>
       <div>
         <label className={labelCls}>Employee Type</label>
-        <select {...f("employeeType")}>
-          <option value="Employee">Employee</option>
-          <option value="Intern">Intern</option>
-        </select>
+        <select {...f("employeeType")}><option value="Employee">Employee</option><option value="Intern">Intern</option></select>
       </div>
       <div>
         <label className={labelCls}>Status</label>
-        <select {...f("status")}>
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+        <select {...f("status")}><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
       </div>
       {showCredentials && <>
         <div><label className={labelCls}>Login ID *</label><input type="text" required {...f("loginId")} placeholder="Login ID" /></div>
