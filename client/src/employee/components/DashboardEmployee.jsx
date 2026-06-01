@@ -48,6 +48,8 @@ import LeadManagement from "../pages/LeadManagement";
 import LeaveApplicationForm from "../pages/LeaveApplicaationForm";
 import EmployeeTasks from "../pages/EmployeeTasks"
 import EmployeeDocumentation from "../pages/Employeedocumentation";
+import EmployeeSalaryDetails from "../pages/EmployeeSalaryDetails"; // 👈 ADD THIS IMPORT
+
 
 /* ==================== DASHBOARD CONTENT ==================== */
 const DashboardContent = () => {
@@ -200,7 +202,7 @@ const DashboardContent = () => {
       </div>
 
       {/* Quick Actions - Responsive Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
         {[
           ...(employee?.employeeType !== "Intern" ? [
             { action: "clockIn", label: "Clock In", color: "green", icon: <FaUserClock className="text-sm sm:text-base" /> },
@@ -208,6 +210,7 @@ const DashboardContent = () => {
           ] : []),
           { to: "/employee/dashboard/all/tasks", label: "My Tasks", color: "blue", icon: <FaTasks className="text-sm sm:text-base" /> },
           { to: "/employee/dashboard/attendance", label: "Attendance", color: "purple", icon: <RiCalendarScheduleLine className="text-sm sm:text-base" /> },
+          { to: "/employee/dashboard/salary", label: "Salary", color: "indigo", icon: <FaMoneyBillWave className="text-sm sm:text-base" /> }, // 👈 ADD SALARY BUTTON
         ].map((btn, i) => (
           btn.to ? (
             <Link 
@@ -389,7 +392,11 @@ const DashboardEmployee = () => {
     { path: "/employee/dashboard/leadmanagement", label: "Lead Management", icon: <FaUserPlus className="text-base sm:text-xl" /> },
     { path: "/employee/dashboard/all/tasks", label: "My Tasks", icon: <SiGoogletasks className="text-base sm:text-xl" /> },
     { path: "/employee/dashboard/expense", label: "Expense", icon: <FaMoneyBillWave className="text-base sm:text-xl" /> },
+
     { path: "/employee/dashboard/documentation", label: "Documentation", icon: <SiGoogleforms className="text-base sm:text-xl" /> },
+
+    { path: "/employee/dashboard/salary", label: "Salary Details", icon: <FaMoneyBillWave className="text-base sm:text-xl" /> }, // 👈 ADD SALARY MENU ITEM
+
     { path: "/employee/dashboard/settings", label: "Settings", icon: <FiSettings className="text-base sm:text-xl" /> },
   ];
 
@@ -406,7 +413,11 @@ const DashboardEmployee = () => {
           "/employee/dashboard/leadmanagement",
           "/employee/dashboard/expense",
           "/employee/dashboard/all/tasks",
+
           "/employee/dashboard/documentation",
+
+          "/employee/dashboard/salary", // 👈 ALLOW INTERNS TO VIEW SALARY
+
           "/employee/dashboard/settings",
         ];
         return allowedRoutes.includes(item.path);
@@ -430,7 +441,11 @@ const DashboardEmployee = () => {
         "/employee/dashboard/leadmanagement",
         "/employee/dashboard/expense",
         "/employee/dashboard/all/tasks",
+
         "/employee/dashboard/documentation",
+
+        "/employee/dashboard/salary", // 👈 ALLOW INTERNS TO VIEW SALARY
+
         "/employee/dashboard/settings",
       ];
       
@@ -622,7 +637,11 @@ const DashboardEmployee = () => {
               <Route path="leadmanagement" element={<LeadManagement />} />
               <Route path="all/tasks" element={<EmployeeTasks />} />
               <Route path="expense" element={<Expense />} />
+
               <Route path="documentation" element={<EmployeeDocumentation />} />
+
+              <Route path="salary" element={<EmployeeSalaryDetails />} /> {/* 👈 ADD SALARY ROUTE */}
+
               <Route path="settings" element={<EmployeeSettings />} />
               
               <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
