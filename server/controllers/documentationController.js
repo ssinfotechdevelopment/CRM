@@ -1,4 +1,3 @@
-// server/controllers/documentationController.js
 import { id } from "zod/v4/locales";
 import Documentation from "../models/documentationModel.js";
 import Employee from "../models/employeeModel.js";
