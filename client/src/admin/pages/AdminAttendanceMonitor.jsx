@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 import { toast, Toaster } from "react-hot-toast";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const API = "http://sscrmbackend.ssinfotech.co.in/api";
+const API = "https://sscrmbackend.ssinfotech.co.in/api";
 const ITEMS_PER_PAGE = 20;
 
 const HOLIDAY_TYPES = {

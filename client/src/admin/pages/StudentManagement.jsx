@@ -106,7 +106,7 @@ const StudentManagement = () => {
     { id: 1, studentId: "1", message: "₹20,000 pending for Web Development course", date: "2024-04-20", completed: false }
   ]);
 
-  const API_URL = "http://sscrmbackend.ssinfotech.co.in/api/students";
+  const API_URL = "https://sscrmbackend.ssinfotech.co.in/api/students";
 
   // Fetch all students
   const fetchStudents = async (query = "") => {

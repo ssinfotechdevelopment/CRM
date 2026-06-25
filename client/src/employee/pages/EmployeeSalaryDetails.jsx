@@ -9,7 +9,7 @@ import { toast, Toaster } from "react-hot-toast";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-const API = "http://sscrmbackend.ssinfotech.co.in/api";
+const API = "https://sscrmbackend.ssinfotech.co.in/api";
 
 const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

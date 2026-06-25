@@ -5,7 +5,7 @@ import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 
 // ─── AXIOS INSTANCE ───────────────────────────────────────────────────────────
-const api = axios.create({ baseURL: "http://sscrmbackend.ssinfotech.co.in/api" });
+const api = axios.create({ baseURL: "https://sscrmbackend.ssinfotech.co.in/api" });
 
 api.interceptors.request.use((cfg) => {
   const t = localStorage.getItem("adminToken");

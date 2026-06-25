@@ -104,7 +104,7 @@ const DEPARTMENTS = [
   { id: 6, name: "Operations" },
 ];
 
-const API_URL = "http://sscrmbackend.ssinfotech.co.in/api";
+const API_URL = "https://sscrmbackend.ssinfotech.co.in/api";
 const BATCH_SIZE = 4;
 
 const EMPTY_NEW_EMP = {

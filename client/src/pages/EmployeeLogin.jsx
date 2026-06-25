@@ -42,7 +42,7 @@ const EmployeeLogin = () => {
     }
 
     try {
-      const res = await fetch("http://sscrmbackend.ssinfotech.co.in/api/employee/login", {
+      const res = await fetch("https://sscrmbackend.ssinfotech.co.in/api/employee/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),

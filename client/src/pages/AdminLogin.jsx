@@ -22,8 +22,8 @@ const AdminLogin = () => {
     }
 
     try {
-      // Vite proxy → /api/admin/login → http://sscrmbackend.ssinfotech.co.in/api/admin/login
-      const res = await fetch("http://sscrmbackend.ssinfotech.co.in/api/admin/login", {
+      // Vite proxy → /api/admin/login → https://sscrmbackend.ssinfotech.co.in/api/admin/login
+      const res = await fetch("https://sscrmbackend.ssinfotech.co.in/api/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

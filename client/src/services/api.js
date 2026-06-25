@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-    baseURL: "http://sscrmbackend.ssinfotech.co.in",
+    baseURL: "https://sscrmbackend.ssinfotech.co.in",
 });
 
 // Add token to every request automatically
