@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 // API Configuration
-const API_BASE_URL = "https://crm-backend-v2.onrender.com/api";
+const API_BASE_URL = "http://sscrmbackend.ssinfotech.co.in/api";
 
 // SVG Icons Components (keep your existing icons as is)
 const DashboardIcon = ({ className = "w-5 h-5" }) => (

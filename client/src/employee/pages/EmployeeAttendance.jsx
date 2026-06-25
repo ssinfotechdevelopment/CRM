@@ -258,10 +258,10 @@ const EmployeeAttendance = () => {
       try {
         // Fire both requests simultaneously
         const [attendanceRes, holidaysRes] = await Promise.all([
-          fetch("https://crm-backend-v2.onrender.com/api/attendance/history", {
+          fetch("http://sscrmbackend.ssinfotech.co.in/api/attendance/history", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("https://crm-backend-v2.onrender.com/api/holidays/all"),
+          fetch("http://sscrmbackend.ssinfotech.co.in/api/holidays/all"),
         ]);
 
         // ── Process attendance ────────────────────────────────────────────
@@ -364,7 +364,7 @@ const EmployeeAttendance = () => {
 
       const { latitude, longitude } = position.coords;
       const res = await fetch(
-        "https://crm-backend-v2.onrender.com/api/attendance/clock-in",
+        "http://sscrmbackend.ssinfotech.co.in/api/attendance/clock-in",
         {
           method: "POST",
           headers: {
@@ -392,7 +392,7 @@ const EmployeeAttendance = () => {
     setClocking("out");
     try {
       const res = await fetch(
-        "https://crm-backend-v2.onrender.com/api/attendance/clock-out",
+        "http://sscrmbackend.ssinfotech.co.in/api/attendance/clock-out",
         {
           method: "POST",
           headers: {

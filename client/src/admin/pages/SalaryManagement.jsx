@@ -10,7 +10,7 @@ import * as XLSX from "xlsx";
 import { toast, Toaster } from "react-hot-toast";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const API = "https://crm-backend-v2.onrender.com/api";
+const API = "http://sscrmbackend.ssinfotech.co.in/api";
 const WORKING_DAYS_PER_MONTH = 22;
 const PAID_LEAVES_ALLOWED = 2;
 

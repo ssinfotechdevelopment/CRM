@@ -7,7 +7,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 const IST = "Asia/Kolkata";
-const API_BASE_URL = "https://crm-backend-v2.onrender.com";
+const API_BASE_URL = "http://sscrmbackend.ssinfotech.co.in";
 
 const EmployeeData = () => {
   const [attendance, setAttendance] = useState([]);

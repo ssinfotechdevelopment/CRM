@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { toast, Toaster } from "react-hot-toast";
 
-const BASE = "https://crm-backend-v2.onrender.com/api";
+const BASE = "http://sscrmbackend.ssinfotech.co.in/api";
 
 const STATUS_BADGE = {
   Pending:  { bg: "bg-yellow-100", text: "text-yellow-700", icon: Clock },
