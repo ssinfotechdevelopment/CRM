@@ -62,14 +62,11 @@ app.use(express.json());
 // ---------------- CORS ----------------
 
 const allowedOrigins = [
-<<<<<<< HEAD
   "https://ssinfotech-crm.netlify.app", 
   "https://crm.ssinfotech.co.in",
   "http://sscrmbackend.ssinfotech.co.in",
-=======
   "https://ssinfotech-crm.netlify.app",
   "https://sscrm.ssinfotech.co",
->>>>>>> 6b9a7b0e01849b6f5f0e8cf948fcf52e6fd7af9c
   "http://localhost:5173"
 ];
 
