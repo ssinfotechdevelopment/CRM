@@ -23,6 +23,7 @@ import holidayRoutes from "./routes/holidayRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import guestRoutes from "./routes/guestsController.js";
 import documentation from "./routes/documentationRoutes.js";
+
 dotenv.config();
 
 // For ESM dirname usage
@@ -99,15 +100,21 @@ app.use("/api/holidays", holidayRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/guests", guestRoutes);
 app.use("/api/documentation", documentation);
+
 // ---------------- Serve Frontend in production ----------------
 if (process.env.NODE_ENV === "production") {
   const frontendPath = path.join(__dirname, "client/dist");
 
   app.use(express.static(frontendPath));
 
-  // Wildcard route - send frontend for unknown paths
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(frontendPath, "index.html"));
+  // ✅ FIXED: Wildcard route ke liye sahi tarika
+  app.use((req, res, next) => {
+    // Agar API route nahi hai toh frontend bhejo
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(path.join(frontendPath, "index.html"));
+    } else {
+      next();
+    }
   });
 }
 // ----------------------------------------------------------------
@@ -127,6 +134,6 @@ app.use((err, req, res, next) => {
 
 // Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Backend Server Running on Port: ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Backend Server Running on Port: ${PORT}`);
 });
