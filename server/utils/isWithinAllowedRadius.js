@@ -1,4 +1,3 @@
-// utils/geoUtils.js
 const haversineDistance = (lat1, lon1, lat2, lon2) => {
   const toRad = (num) => (num * Math.PI) / 180;
 
