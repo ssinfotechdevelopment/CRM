@@ -1,5 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
+
 import connectDB from "./config/db.js";
 import Counter from "./models/counter.js";
 
@@ -22,9 +24,12 @@ import documentation from "./routes/documentationRoutes.js";
 
 dotenv.config();
 
-// Connect Database
+// Database Connection
 connectDB();
 
+const app = express();
+
+// Counter Initialization
 const initCounter = async () => {
   try {
     const counter = await Counter.findOne({
@@ -54,52 +59,66 @@ const initCounter = async () => {
 
 initCounter();
 
-const app = express();
-
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ---------------- CORS ----------------
+// ==================== CORS ====================
 
 const allowedOrigins = [
-  "https://ssinfotech-crm.netlify.app", 
   "https://crm.ssinfotech.co.in",
   "https://sscrmbackend.ssinfotech.co.in",
   "https://ssinfotech-crm.netlify.app",
-  "https://sscrm.ssinfotech.co",
-  "http://localhost:5173"
+  "http://localhost:5173",
 ];
 
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow Postman, Mobile Apps, Server-to-Server requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.log("Blocked Origin:", origin);
+
+      return callback(
+        new Error("Not allowed by CORS")
+      );
+    },
+    credentials: true,
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+    ],
+  })
+);
+
+// Handle Preflight Requests
+app.options("*", cors());
+
+// Debug Middleware
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
-
-  res.header(
-    "Access-Control-Allow-Credentials",
-    "true"
+  console.log(
+    `${req.method} ${req.originalUrl} | Origin: ${req.headers.origin}`
   );
-
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,PATCH,OPTIONS"
-  );
-
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-
   next();
 });
 
-// ---------------- API ROUTES ----------------
+// ==================== ROUTES ====================
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/employee", employeeRoutes);
@@ -135,7 +154,7 @@ app.use((req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error("Global Error:", err);
+  console.error(err);
 
   res.status(err.status || 500).json({
     success: false,
@@ -143,11 +162,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Server
+// Start Server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `✅ Backend Server Running on Port: ${PORT}`
+    `✅ Backend Server Running on Port ${PORT}`
   );
 });
