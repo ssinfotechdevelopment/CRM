@@ -11,7 +11,7 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import salaryRoutes from "./routes/salaryRoute.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import studentRoutes from "./routes/student.routes.js";
-import Course from "./routes/courses.js";
+import courseRoutes from "./routes/courses.js";
 import clientRoutes from "./routes/clientRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
@@ -20,21 +20,19 @@ import leaveRoutes from "./routes/leaveRoutes.js";
 import holidayRoutes from "./routes/holidayRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import guestRoutes from "./routes/guestsController.js";
-import documentation from "./routes/documentationRoutes.js";
+import documentationRoutes from "./routes/documentationRoutes.js";
 
 dotenv.config();
 
-// Database Connection
+// ================= DATABASE =================
 connectDB();
 
 const app = express();
 
-// Counter Initialization
+// ================= COUNTER INITIALIZATION =================
 const initCounter = async () => {
   try {
-    const counter = await Counter.findOne({
-      _id: "client_project_number",
-    });
+    const counter = await Counter.findById("client_project_number");
 
     if (!counter) {
       await Counter.create({
@@ -42,28 +40,26 @@ const initCounter = async () => {
         seq: 1000,
       });
 
-      console.log(
-        "Counter initialized → Next project: PROJ-000001"
-      );
+      console.log("✅ Counter initialized → Next Project: PROJ-001001");
     } else {
       console.log(
-        `Counter exists → Next project: PROJ-${String(
+        `✅ Counter exists → Next Project: PROJ-${String(
           counter.seq + 1
         ).padStart(6, "0")}`
       );
     }
-  } catch (err) {
-    console.error("Failed to initialize counter:", err);
+  } catch (error) {
+    console.error("❌ Failed to initialize counter:", error);
   }
 };
 
 initCounter();
 
-// Middleware
+// ================= MIDDLEWARE =================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ==================== CORS ====================
+// ================= CORS =================
 
 const allowedOrigins = [
   "https://crm.ssinfotech.co.in",
@@ -72,60 +68,61 @@ const allowedOrigins = [
   "http://localhost:5173",
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow Postman, Mobile Apps, Server-to-Server requests
-      if (!origin) {
-        return callback(null, true);
-      }
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow Postman, Mobile Apps & Server-to-Server requests
+    if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      console.log("Blocked Origin:", origin);
+    console.log("❌ Blocked Origin:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
 
-      return callback(
-        new Error("Not allowed by CORS")
-      );
-    },
-    credentials: true,
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-    ],
-  })
-);
+  credentials: true,
 
-// Handle Preflight Requests
-app.options("*", cors());
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
 
-// Debug Middleware
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+  ],
+};
+
+app.use(cors(corsOptions));
+
+// Express 5 Compatible
+app.options(/.*/, cors(corsOptions));
+
+// ================= REQUEST LOGGER =================
+
 app.use((req, res, next) => {
   console.log(
-    `${req.method} ${req.originalUrl} | Origin: ${req.headers.origin}`
+    `${req.method} ${req.originalUrl} | Origin: ${
+      req.headers.origin || "No Origin"
+    }`
   );
   next();
 });
 
-// ==================== ROUTES ====================
+// ================= ROUTES =================
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/lead", leadRoutes);
 app.use("/api/salaries", salaryRoutes);
 app.use("/api/attendance", attendanceRoutes);
-app.use("/api/courses", Course);
+app.use("/api/courses", courseRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/projects", projectRoutes);
@@ -134,9 +131,10 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/holidays", holidayRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/guests", guestRoutes);
-app.use("/api/documentation", documentation);
+app.use("/api/documentation", documentationRoutes);
 
-// Root Route
+// ================= ROOT =================
+
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -144,7 +142,8 @@ app.get("/", (req, res) => {
   });
 });
 
-// 404 Handler
+// ================= 404 =================
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -152,21 +151,21 @@ app.use((req, res) => {
   });
 });
 
-// Global Error Handler
+// ================= ERROR HANDLER =================
+
 app.use((err, req, res, next) => {
-  console.error(err);
+  console.error("❌ Error:", err);
 
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || "Server Error",
+    message: err.message || "Internal Server Error",
   });
 });
 
-// Start Server
+// ================= SERVER =================
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `✅ Backend Server Running on Port ${PORT}`
-  );
+  console.log(`🚀 Server running on port ${PORT}`);
 });
