@@ -28,8 +28,8 @@ const UsersIcon    = ({ c }) => <Icon className={c || "w-5 h-5"} d="M12 4.354a4 
 
 // ─── API BASE — relative so Vite proxy works locally, deployed URL works in prod ─
 // Vite proxy in vite.config.js forwards /api → https://crm-server-jl9z.onrender.com
-const API_EVENTS = "https://sscrmbackend.ssinfotech.co.in/api/events";
-const API_GUESTS = "https://sscrmbackend.ssinfotech.co.in/api/guests";
+const API_EVENTS = "https://crm-backned-v1.onrender.com/api/events";
+const API_GUESTS = "https://crm-backned-v1.onrender.com/api/guests";
 
 // ─── Auth header helper ───────────────────────────────────────────────────────
 const authHeader = (token) => ({ Authorization: `Bearer ${token}` });

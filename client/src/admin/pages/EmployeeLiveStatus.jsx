@@ -3,7 +3,7 @@ import React, {
 } from "react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const API_URL      = "https://sscrmbackend.ssinfotech.co.in/api";
+const API_URL      = "https://crm-backned-v1.onrender.com/api";
 const STATUS_BATCH = 5;
 
 const DEPARTMENTS = [

@@ -5,7 +5,7 @@ import { Plus, FileText, Check, Loader, Edit, Trash2, RefreshCw, AlertCircle, Fi
 import { toast, Toaster } from "react-hot-toast";
 
 const IST = "Asia/Kolkata";
-const API_URL = "https://sscrmbackend.ssinfotech.co.in/api";
+const API_URL = "https://crm-backned-v1.onrender.com/api";
 const PUBLIC_USER_ID = "public-user"; // Changed to match backend
 
 // Priority and Type options

@@ -63,7 +63,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const allowedOrigins = [
   "https://crm.ssinfotech.co.in",
-  "https://sscrmbackend.ssinfotech.co.in",
+  "https://crm-backned-v1.onrender.com",
   "https://ssinfotech-crm.netlify.app",
   "http://localhost:5173",
 ];
